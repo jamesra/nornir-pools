@@ -6,7 +6,7 @@ Created on Feb 14, 2013
 import unittest
 import os
 import shutil
-import Pools
+import pools
 import time
 import random
 import types
@@ -146,7 +146,7 @@ class TestThreadPool(TestThreadPoolBase):
         os.remove(ExpectedPath);
 
         # Create a 100 threads and have them create files
-        TPool = Pools.GetGlobalThreadPool();
+        TPool = pools.GetGlobalThreadPool();
         self.assertIsNotNone(TPool);
 
         self.runOnPool(TPool);
@@ -162,7 +162,7 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
         os.remove(ExpectedPath);
 
         # Create a 100 threads and have them create files
-        TPool = Pools.GetGlobalMultithreadingPool();
+        TPool = pools.GetGlobalMultithreadingPool();
         self.assertIsNotNone(TPool);
 
         self.runOnPool(TPool);
@@ -172,7 +172,7 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
     FilenameTemplate = "%04d.txt";
 
     def runTest(self):
-        TPool = Pools.GetGlobalMultithreadingPool();
+        TPool = pools.GetGlobalMultithreadingPool();
         self.assertIsNotNone(TPool);
 
         self.runOnPool(TPool, CreateFunc = CreateFileWithDelay, ReadFunc = ReadFileWithDelay);
@@ -182,7 +182,7 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
     FilenameTemplate = "%04d.txt";
 
     def runTest(self):
-        TPool = Pools.GetGlobalThreadPool();
+        TPool = pools.GetGlobalThreadPool();
         self.assertIsNotNone(TPool);
 
         self.runOnPool(TPool, CreateFunc = CreateFileWithDelay, ReadFunc = ReadFileWithDelay);
@@ -192,7 +192,7 @@ class TestProcessPool(unittest.TestCase):
     def runTest(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 
-        PPool = Pools.GetGlobalProcessPool();
+        PPool = pools.GetGlobalProcessPool();
         self.assertIsNotNone(PPool);
 
         numTasksInTest = 100;
@@ -219,7 +219,7 @@ class TestClusterPool(unittest.TestCase):
     def runTest(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 
-        PPool = Pools.GetGlobalClusterPool();
+        PPool = pools.GetGlobalClusterPool();
         self.assertIsNotNone(PPool);
 
         numTasksInTest = 1000;
@@ -250,7 +250,7 @@ class TestClusterPool(unittest.TestCase):
 #    def runTest(self):
 #        #command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 #
-#        PPool = Pools.GetGlobalClusterPool();
+#        PPool = pools.GetGlobalClusterPool();
 #        self.assertIsNotNone(PPool);
 #
 #        numTasksInTest = 100;
@@ -274,5 +274,5 @@ class TestClusterPool(unittest.TestCase):
 #
 
 if __name__ == "__main__":
-    # import sys;sys.argv = ['', 'Test.testPools']
+    # import sys;sys.argv = ['', 'Test.testpools']
     unittest.main()

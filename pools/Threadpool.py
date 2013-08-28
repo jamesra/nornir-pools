@@ -14,12 +14,12 @@ import time
 import traceback
 import logging
 import os
-import Pools.task
+import pools.task
 
-import Pools
+import pools
 
 
-class ThreadTask(Pools.task.Task):
+class ThreadTask(pools.task.Task):
 
 	def __init__(self, name, func, args, kwargs):
 
@@ -117,7 +117,7 @@ class Worker(threading.Thread):
 			if JobsQueued > 0:
 			    JobQText = "Jobs Queued: " + str(self.tasks.qsize());
 			    JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-			    Pools.pprint (JobQText);
+			    pools.pprint (JobQText);
 
 			self.tasks.task_done()
 

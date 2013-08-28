@@ -15,10 +15,10 @@ import subprocess
 import logging
 import os
 
-import Pools.task
-import Pools
+import pools.task
+import pools
 
-class ProcessTask(Pools.task.Task):
+class ProcessTask(pools.task.Task):
 
     def wait_return(self):
         self.wait();
@@ -116,7 +116,7 @@ class Worker(threading.Thread):
             if JobsQueued > 0:
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize());
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-                Pools.PrintProgressUpdate (JobQText);
+                pools.PrintProgressUpdate (JobQText);
 
             self.tasks.task_done()
 

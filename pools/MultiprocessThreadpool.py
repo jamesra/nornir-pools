@@ -12,11 +12,11 @@ import threading
 import traceback
 import logging
 import os
-import Pools.task
+import pools.task
 
 from threading import Lock
 
-# import Pools
+# import pools
 
 dictKnownPools = {}
 
@@ -26,7 +26,7 @@ def Create(Poolname=None, num_threads=None):
     global dictKnownPools
 
     if Poolname is None:
-        return Pools.GetGlobalMultithreadingPool()
+        return pools.GetGlobalMultithreadingPool()
 
     if Poolname in dictKnownPools:
         return dictKnownPools[Poolname]
@@ -62,7 +62,7 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount);
     JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)));
-    Pools.PrintProgressUpdate (JobQText);
+    pools.PrintProgressUpdate (JobQText);
 
 
 def _pickle_method(method):

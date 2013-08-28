@@ -11,7 +11,7 @@ import pp
 import subprocess
 from threading import Lock
 
-import Pools.task
+import pools.task
 
 NextGroupName = 0;
 
@@ -36,9 +36,9 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount);
     JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-    Pools.PrintProgressUpdate(JobQText);
+    pools.PrintProgressUpdate(JobQText);
 
-class CTask(Pools.task.Task):
+class CTask(pools.task.Task):
 
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
@@ -95,7 +95,7 @@ class ParallelPythonProcess_Pool:
 
         self.server = pp.Server(ppservers = ("*",))
 
-        Pools.pprint("Wait three seconds for other servers to respond")
+        pools.pprint("Wait three seconds for other servers to respond")
         time.sleep(3)
         self.server.print_stats()
 
