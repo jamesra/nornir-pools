@@ -7,6 +7,7 @@ import ParallelPythonPool
 import atexit
 import os
 import sys
+import datetime
 
 __ProcPool = None;
 __ThreadPool = None;
@@ -48,30 +49,68 @@ def GetGlobalMultithreadingPool():
 
 
 
+#ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
+__LastConsoleWrite = datetime.datetime.utcnow()
+
+def __EclipseConsoleWrite(s, newline=False):
+    s = s.replace('\b', '');
+    s = s.replace('.', '');
+    s = s.strip();
+    
+    if newline:
+        s = s + '\n'
+    
+    sys.stdout.write(s)
+    
+    
+def __PrintProgressUpdateEclipse(s):
+    global __LastConsoleWrite
+    
+    now = datetime.datetime.utcnow()
+    delta = now - __LastConsoleWrite
+    
+    if delta.seconds < 10:
+        return
+    
+    __EclipseConsoleWrite(s, newline=True)
+    __LastConsoleWrite = datetime.datetime.utcnow()
+     
+
+def __ConsoleWrite(s, newline=False):
+    if newline:
+        s = s + '\n'
+    
+    sys.stdout.write(s)
+    
+    
+def PrintProgressUpdate(s):
+    if  'ECLIPSE' in os.environ:
+        __PrintProgressUpdateEclipse(s)
+        return
+        
+    __ConsoleWrite(s)
+    
+
 def sprint(s):
     """ Thread-safe print fucntion """
     # Eclipse copies test output to the unit test window and this copy has
     # problems if the output has non-alphanumeric characters
     if  'ECLIPSE' in os.environ:
-        s = s.replace('\b', '');
-        s = s.replace('.', '');
-        s = s.strip();
-
-    sys.stdout.write(s + '\n')
-
+        __EclipseConsoleWrite(s, newline=True)
+    else:
+        __ConsoleWrite(s, newline=True)
+    
 
 def pprint(s):
     """ Thread-safe print fucntion, no newline """
 
     # Eclipse copies test output to the unit test window and this copy has
     # problems if the output has non-alphanumeric characters
-    if 'ECLIPSE' in os.environ:
-        s = s.replace('\b', '');
-        s = s.replace('.', '');
-        s = s.strip();
-        s = s + '\n';
-
-    sys.stdout.write(s);
+    if  'ECLIPSE' in os.environ:
+        __EclipseConsoleWrite(s, newline=False)
+    else:
+        __ConsoleWrite(s, newline=False)
+        
 
 def ClosePools():
     global __ProcPool

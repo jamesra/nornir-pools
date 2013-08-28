@@ -36,7 +36,7 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount);
     JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-    Pools.pprint (JobQText);
+    Pools.PrintProgressUpdate(JobQText);
 
 class CTask(Pools.task.Task):
 

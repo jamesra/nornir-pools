@@ -5,6 +5,7 @@
 # Made prettier by James Tucker
 
 import multiprocessing
+import multiprocessing.pool
 import threading
 # import copy_reg
 # import types
@@ -17,8 +18,29 @@ from threading import Lock
 
 # import Pools
 
+dictKnownPools = {}
+
+
+def Create(Poolname=None, num_threads=None):
+
+    global dictKnownPools
+
+    if Poolname is None:
+        return Pools.GetGlobalMultithreadingPool()
+
+    if Poolname in dictKnownPools:
+        return dictKnownPools[Poolname]
+
+    pool = MultiprocessThread_Pool(num_threads)
+    pool.Name = Poolname
+
+    dictKnownPools[Poolname] = pool
+
+    return pool
+
 JobCountLock = Lock();
 ActiveJobCount = 0;
+
 
 def IncrementActiveJobCount():
     global JobCountLock
@@ -27,6 +49,7 @@ def IncrementActiveJobCount():
     ActiveJobCount = ActiveJobCount + 1
     JobCountLock.release();
 
+
 def DecrementActiveJobCount():
     global JobCountLock
     global ActiveJobCount
@@ -34,11 +57,13 @@ def DecrementActiveJobCount():
     ActiveJobCount = ActiveJobCount - 1
     JobCountLock.release();
 
+
 def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount);
     JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)));
-    Pools.pprint (JobQText);
+    Pools.PrintProgressUpdate (JobQText);
+
 
 def _pickle_method(method):
     func_name = method.im_func.__name__
@@ -64,6 +89,21 @@ def _unpickle_method(func_name, obj, cls):
 def callback(result):
     DecrementActiveJobCount();
     PrintJobsCount();
+
+
+class NoDaemonProcess(multiprocessing.Process):
+
+    def _get_daemon(self):
+        return False
+
+    def _set_daemon(self, value):
+        pass
+
+    daemon = property(_get_daemon, _set_daemon)
+
+
+class NonDaemonPool(multiprocessing.pool.Pool):
+    Process = NoDaemonProcess
 
 
 class MultiprocessThreadTask():
@@ -102,14 +142,14 @@ class MultiprocessThread_Pool:
 
     """Pool of threads consuming tasks from a queue"""
 
-    def __init__(self, num_threads = None):
-
+    def __init__(self, num_threads=None):
         self.shutdown_event = threading.Event();
         self.logger = logging.getLogger('Multithreading Pool');
         self.logger.warn("Creating Multithreading Pool");
 
         # self.manager =  multiprocessing.Manager();
-        self.tasks = multiprocessing.Pool();
+        # self.tasks = multiprocessing.Pool();
+        self.tasks = NonDaemonPool()
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
     def __del__(self):
@@ -124,7 +164,7 @@ class MultiprocessThread_Pool:
 
         IncrementActiveJobCount();
         PrintJobsCount();
-        task = self.tasks.apply_async(func, args, kwargs, callback = callback);
+        task = self.tasks.apply_async(func, args, kwargs, callback=callback);
         return MultiprocessThreadTask(name, task, self.logger, args, kwargs);
 
 

@@ -116,7 +116,7 @@ class Worker(threading.Thread):
             if JobsQueued > 0:
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize());
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-                Pools.pprint (JobQText);
+                Pools.PrintProgressUpdate (JobQText);
 
             self.tasks.task_done()
 
