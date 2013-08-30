@@ -148,7 +148,10 @@ class TestThreadPool(TestThreadPoolBase):
         # Create a 100 threads and have them create files
         TPool = pools.GetGlobalThreadPool();
         self.assertIsNotNone(TPool);
+        self.runOnPool(TPool);
 
+        TPool = pools.GetThreadPool("Test local thread pool")
+        self.assertIsNotNone(TPool);
         self.runOnPool(TPool);
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
@@ -165,6 +168,10 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
         TPool = pools.GetGlobalMultithreadingPool();
         self.assertIsNotNone(TPool);
 
+        self.runOnPool(TPool);
+
+        TPool = pools.GetMultithreadingPool("Test multithreading pool")
+        self.assertIsNotNone(TPool);
         self.runOnPool(TPool);
 
 class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):

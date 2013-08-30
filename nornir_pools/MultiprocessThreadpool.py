@@ -20,26 +20,6 @@ from threading import Lock
 
 # import pools
 
-dictKnownPools = {}
-
-
-def Create(Poolname=None, num_threads=None):
-
-    global dictKnownPools
-
-    if Poolname is None:
-        return GetGlobalMultithreadingPool()
-
-    if Poolname in dictKnownPools:
-        return dictKnownPools[Poolname]
-
-    pool = MultiprocessThread_Pool(num_threads)
-    pool.Name = Poolname
-
-    dictKnownPools[Poolname] = pool
-
-    return pool
-
 JobCountLock = Lock();
 ActiveJobCount = 0;
 
