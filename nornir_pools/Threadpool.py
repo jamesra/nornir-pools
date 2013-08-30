@@ -14,24 +14,23 @@ import time
 import traceback
 import logging
 import os
-import pools.task
+import task
 
-import pools
+import nornir_pools as pools
 
-
-class ThreadTask(pools.task.Task):
+class ThreadTask(task.Task):
 
 	def __init__(self, name, func, args, kwargs):
 
 		self.func = func  # Function to be called when Task is removed from queue
-		self.returned_value = None;  # The value returned by the executing function
+		self.returned_value = None  # The value returned by the executing function
 
-		super(ThreadTask, self).__init__(name, args, kwargs);
+		super(ThreadTask, self).__init__(name, args, kwargs)
 
 	def wait_return(self):
 
 		"""Waits until the function has completed execution and returns the value returned by the function pointer"""
-		self.wait();
+		self.wait()
 		return self.returned_value
 
 class Worker(threading.Thread):
@@ -44,9 +43,9 @@ class Worker(threading.Thread):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
-        self.shutdown_event = shutdown_event;
+        self.shutdown_event = shutdown_event
         self.daemon = True
-        self.logger = logging.getLogger('ThreadPool');
+        self.logger = logging.getLogger('ThreadPool')
         self.start()
 
 
@@ -57,14 +56,14 @@ class Worker(threading.Thread):
         	# Get next task from the queue (blocks thread if queue is empty until entry arrives)
 
 			try:
-				entry = self.tasks.get(True, Worker.WaitTime);  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
+				entry = self.tasks.get(True, Worker.WaitTime)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
 			except:
 				# Check if we should kill the thread
 				if(self.shutdown_event.isSet()):
-					# sprint ("Queue Empty, exiting worker thread");
+					# sprint ("Queue Empty, exiting worker thread")
 					return
 				else:
-					continue;
+					continue
 
 			 # Record start time so we get a sense of performance
 
@@ -72,9 +71,9 @@ class Worker(threading.Thread):
 
 			 # print notification
 
-			self.logger.info("+++ {0}".format(entry.name));
+			self.logger.info("+++ {0}".format(entry.name))
 			 # sprint("+++ {0}".format(entry.name))
-			 # sprint("+");
+			 # sprint("+")
 
 			# do it!
 
@@ -97,12 +96,12 @@ class Worker(threading.Thread):
 
 			 # generate the time elapsed string for output
 
-			seconds = math.fmod(t_delta, 60);
+			seconds = math.fmod(t_delta, 60)
 			seconds_str = "%02.5g" % seconds
 			time_str = str(time.strftime('%H:%M:', time.gmtime(t_delta))) + seconds_str
 
 			# mark the object event as completed
-			entry.completed.set();
+			entry.completed.set()
 
 			# print the completion notice with times aligned
 
@@ -111,13 +110,14 @@ class Worker(threading.Thread):
 			out_string += " " * (time_position - len(out_string))
 			out_string += time_str
 
-			self.logger.info(out_string);
+			self.logger.info(out_string)
 
-			JobsQueued = self.tasks.qsize();
+			JobsQueued = self.tasks.qsize()
 			if JobsQueued > 0:
-			    JobQText = "Jobs Queued: " + str(self.tasks.qsize());
-			    JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)));
-			    pools.pprint (JobQText);
+
+			    JobQText = "Jobs Queued: " + str(self.tasks.qsize())
+			    JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
+			    pools.PrintProgressUpdate(JobQText)
 
 			self.tasks.task_done()
 
@@ -132,25 +132,25 @@ class Thread_Pool:
     def __init__(self, num_threads = None):
 
         if (num_threads is None):
-        	num_threads = multiprocessing.cpu_count();
+        	num_threads = multiprocessing.cpu_count()
 
-        self.num_threads = num_threads;
-        self.shutdown_event = threading.Event();
-        self.logger = logging.getLogger('ThreadPool');
-        self.keep_alive_thread = None;
+        self.num_threads = num_threads
+        self.shutdown_event = threading.Event()
+        self.logger = logging.getLogger('ThreadPool')
+        self.keep_alive_thread = None
         self.tasks = queue.Queue()
-        self.logger.warn("Creating Thread Pool");
+        self.logger.warn("Creating Thread Pool")
         self.Threads = []
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
     def __del__(self):
-    	self.wait_completion();
+    	self.wait_completion()
         # Close all of our threads
-        self.shutdown_event.set();
+        self.shutdown_event.set()
 
-        self.Threads = [];
+        self.Threads = []
 
-        time.sleep(Worker.WaitTime + 1);
+        time.sleep(Worker.WaitTime + 1)
 
     def __keep_alive_thread_func(self):
 
@@ -165,26 +165,26 @@ class Thread_Pool:
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
 
-        start_keep_alive_thread = False;
+        start_keep_alive_thread = False
         if self.keep_alive_thread is None:
-            start_keep_alive_thread = True;
+            start_keep_alive_thread = True
         elif self.keep_alive_thread.is_alive() == False:
-            start_keep_alive_thread = True;
+            start_keep_alive_thread = True
 
     	entry = ThreadTask(name, func, args, kwargs)
         self.tasks.put(entry)
 
         # We start threadpool with no threads, and add threads as the queue grows.
         if len(self.Threads) < self.num_threads:
-            JobsQueued = self.tasks.qsize();
+            JobsQueued = self.tasks.qsize()
             if JobsQueued > len(self.Threads):
-                self.Threads.append(Worker(self.tasks, self.shutdown_event));
+                self.Threads.append(Worker(self.tasks, self.shutdown_event))
 
         if start_keep_alive_thread:
-            self.keep_alive_thread = threading.Thread(group = None, target = self.__keep_alive_thread_func, name = "Thread_Pool keep alive thread");
+            self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
             self.keep_alive_thread.start()
 
-        return entry;
+        return entry
 
 
     def wait_completion(self):

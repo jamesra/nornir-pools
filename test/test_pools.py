@@ -6,7 +6,7 @@ Created on Feb 14, 2013
 import unittest
 import os
 import shutil
-import pools
+import nornir_pools as pools
 import time
 import random
 import types
@@ -85,7 +85,7 @@ class TestThreadPoolBase(PoolTestBase):
 
     FilenameTemplate = "%04d.txt";
 
-    def runOnPool(self, TPool, CreateFunc = None, ReadFunc = None, numThreadsInTest = 100):
+    def runOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
 
         if CreateFunc is None:
             CreateFunc = CreateFile;
@@ -175,7 +175,7 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
         TPool = pools.GetGlobalMultithreadingPool();
         self.assertIsNotNone(TPool);
 
-        self.runOnPool(TPool, CreateFunc = CreateFileWithDelay, ReadFunc = ReadFileWithDelay);
+        self.runOnPool(TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay);
 
 class TestThreadPoolWithRandomDelay(TestThreadPool):
     ''' Same as TestThreadPool, but the functions call sleep for random amounts of time'''
@@ -185,7 +185,7 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
         TPool = pools.GetGlobalThreadPool();
         self.assertIsNotNone(TPool);
 
-        self.runOnPool(TPool, CreateFunc = CreateFileWithDelay, ReadFunc = ReadFileWithDelay);
+        self.runOnPool(TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay);
 
 class TestProcessPool(unittest.TestCase):
 
@@ -199,7 +199,7 @@ class TestProcessPool(unittest.TestCase):
         tasks = [];
         for i in range(1, numTasksInTest):
             cmd = "echo %d && exit" % i;
-            task = PPool.add_task(str(i), cmd, shell = True);
+            task = PPool.add_task(str(i), cmd, shell=True);
             tasks.append(task);
 
         Sum = 0;

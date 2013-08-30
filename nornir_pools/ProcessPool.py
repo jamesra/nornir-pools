@@ -15,10 +15,11 @@ import subprocess
 import logging
 import os
 
-import pools.task
-import pools
+import nornir_pools as pools
 
-class ProcessTask(pools.task.Task):
+import task
+
+class ProcessTask(task.Task):
 
     def wait_return(self):
         self.wait();

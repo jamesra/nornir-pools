@@ -12,7 +12,9 @@ import threading
 import traceback
 import logging
 import os
-import pools.task
+import task
+
+import nornir_pools as pools
 
 from threading import Lock
 
@@ -26,7 +28,7 @@ def Create(Poolname=None, num_threads=None):
     global dictKnownPools
 
     if Poolname is None:
-        return pools.GetGlobalMultithreadingPool()
+        return GetGlobalMultithreadingPool()
 
     if Poolname in dictKnownPools:
         return dictKnownPools[Poolname]

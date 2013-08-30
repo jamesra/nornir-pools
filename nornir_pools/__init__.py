@@ -1,4 +1,4 @@
-__all__ = ['ProcessPool', 'ThreadPool', 'Task']
+__all__ = ['task']
 
 import ProcessPool
 import Threadpool
