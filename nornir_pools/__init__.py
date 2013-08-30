@@ -1,9 +1,9 @@
 __all__ = ['task']
 
-import ProcessPool
-import Threadpool
-import MultiprocessThreadpool
-import ParallelPythonPool
+import processpool
+import threadpool
+import multiprocessthreadpool
+import parallelpythonpool
 import atexit
 import os
 import sys
@@ -18,7 +18,7 @@ def GetGlobalProcessPool():
     global __ProcPool
 
     if __ProcPool is None:
-        __ProcPool = ProcessPool.Process_Pool();
+        __ProcPool = processpool.Process_Pool();
 
     return __ProcPool;
 
@@ -26,7 +26,7 @@ def GetGlobalClusterPool():
     global __ClusterProcPool
 
     if __ClusterProcPool is None:
-        __ClusterProcPool = ParallelPythonPool.ParallelPythonProcess_Pool();
+        __ClusterProcPool = parallelpythonpool.ParallelPythonProcess_Pool();
 
     return __ClusterProcPool;
 
@@ -34,7 +34,7 @@ def GetGlobalThreadPool():
     global __ThreadPool
 
     if __ThreadPool is None:
-        __ThreadPool = Threadpool.Thread_Pool();
+        __ThreadPool = threadpool.Thread_Pool();
 
     return __ThreadPool;
 
@@ -43,7 +43,7 @@ def GetGlobalMultithreadingPool():
     global __MultithreadingPool
 
     if __MultithreadingPool is None:
-        __MultithreadingPool = MultiprocessThreadpool.MultiprocessThread_Pool();
+        __MultithreadingPool = multiprocessthreadpool.MultiprocessThread_Pool();
 
     return __MultithreadingPool;
 
@@ -131,8 +131,6 @@ def ClosePools():
 
     if not __MultithreadingPool is None:
         __MultithreadingPool.wait_completion();
-
-
 
     # if not __ClusterProcPool is None:
     #    del __ClusterProcPool;
