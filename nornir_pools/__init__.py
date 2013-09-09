@@ -1,7 +1,7 @@
-import nornir_pools.processpool
-import nornir_pools.threadpool
-import nornir_pools.multiprocessthreadpool
-import nornir_pools.parallelpythonpool
+import nornir_pools.processpool as processpool
+import nornir_pools.threadpool as threadpool
+import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
+import nornir_pools.parallelpythonpool as parallelpythonpool
 import atexit
 import os
 import sys
