@@ -1,3 +1,4 @@
+
 import processpool
 import threadpool
 import multiprocessthreadpool
@@ -6,6 +7,8 @@ import atexit
 import os
 import sys
 import datetime
+
+import logging
 
 dictKnownPools = {}
 
@@ -57,11 +60,6 @@ def GetGlobalThreadPool():
 def GetGlobalMultithreadingPool():
     '''Threads based on pythons multiprocess library which places each thread in a seperate process to avoid the GIL'''
     return GetMultithreadingPool("Global multithreading pool")
-
-
-
-
-
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
 __LastConsoleWrite = datetime.datetime.utcnow()

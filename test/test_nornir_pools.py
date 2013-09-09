@@ -9,7 +9,7 @@ import shutil
 import nornir_pools as pools
 import time
 import random
-import types
+import multiprocessing
 
 
 def CreateFile(path, number):
@@ -74,6 +74,10 @@ class PoolTestBase(unittest.TestCase):
             shutil.rmtree(self.TestOutputPath)
 
         os.makedirs(self.TestOutputPath)
+        self.assertTrue(os.path.exists(self.TestOutputPath), "Test output directory does not exist after creation")
+
+    def runTest(self):
+        self.skipTest("PoolTestBase, no test implemented")
 
     def tearDown(self):
         if os.path.exists(self.TestOutputPath):
@@ -134,6 +138,9 @@ class TestThreadPoolBase(PoolTestBase):
             self.assertFalse(os.path.exists(filenamefullpath), "file undeleted after task reported complete")
 
         self.assertEqual(0, len(os.listdir(self.TestOutputPath)))
+
+    def runTest(self):
+        self.skipTest("TestThreadPoolBase, no test implemented")
 
 class TestThreadPool(TestThreadPoolBase):
 
@@ -229,7 +236,7 @@ class TestClusterPool(unittest.TestCase):
         PPool = pools.GetGlobalClusterPool()
         self.assertIsNotNone(PPool)
 
-        numTasksInTest = 1000
+        numTasksInTest = 100
 
         nodes = PPool.get_active_nodes()
         print "Active Nodes"
@@ -282,4 +289,5 @@ class TestClusterPool(unittest.TestCase):
 
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
-    unittest.main()
+    multiprocessing.freeze_support()
+    # unittest.main()

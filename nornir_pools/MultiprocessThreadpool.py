@@ -20,31 +20,31 @@ from threading import Lock
 
 # import pools
 
-JobCountLock = Lock();
-ActiveJobCount = 0;
+JobCountLock = Lock()
+ActiveJobCount = 0
 
 
 def IncrementActiveJobCount():
     global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True);
+    JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount + 1
-    JobCountLock.release();
+    JobCountLock.release()
 
 
 def DecrementActiveJobCount():
     global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True);
+    JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount - 1
-    JobCountLock.release();
+    JobCountLock.release()
 
 
 def PrintJobsCount():
     global ActiveJobCount
-    JobQText = "Jobs Queued: " + str(ActiveJobCount);
-    JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)));
-    pools.PrintProgressUpdate (JobQText);
+    JobQText = "Jobs Queued: " + str(ActiveJobCount)
+    JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)))
+    pools.PrintProgressUpdate (JobQText)
 
 
 def _pickle_method(method):
@@ -69,8 +69,8 @@ def _unpickle_method(func_name, obj, cls):
 # copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
 def callback(result):
-    DecrementActiveJobCount();
-    PrintJobsCount();
+    DecrementActiveJobCount()
+    PrintJobsCount()
 
 
 class NoDaemonProcess(multiprocessing.Process):
@@ -102,61 +102,66 @@ class MultiprocessThreadTask():
     def wait_return(self):
 
         """Waits until the function has completed execution and returns the value returned by the function pointer"""
-        retval = self.asyncresult.get();
+        retval = self.asyncresult.get()
         if self.asyncresult.successful():
-            return retval;
+            return retval
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            return None;
+            return None
 
     def wait(self):
 
         """Wait for task to complete, does not return a value"""
 
-        self.asyncresult.wait();
+        self.asyncresult.wait()
         if self.asyncresult.successful():
             return
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            return None;
+            return None
 
 class MultiprocessThread_Pool:
 
     """Pool of threads consuming tasks from a queue"""
 
     def __init__(self, num_threads=None):
-        self.shutdown_event = threading.Event();
-        self.logger = logging.getLogger('Multithreading Pool');
-        self.logger.warn("Creating Multithreading Pool");
+        self.shutdown_event = threading.Event()
+        self.logger = logging.getLogger('Multithreading Pool')
+        self.logger.warn("Creating Multithreading Pool")
 
-        # self.manager =  multiprocessing.Manager();
-        # self.tasks = multiprocessing.Pool();
+        # self.manager =  multiprocessing.Manager()
+        # self.tasks = multiprocessing.Pool()
         self.tasks = NonDaemonPool()
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
     def __del__(self):
 
-        self.tasks.close()
-        self.tasks.join()
+        if hasattr(self, 'tasks'):
+            self.tasks.close()
+            self.tasks.join()
+            del self.tasks
 
 
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
 
-        IncrementActiveJobCount();
-        PrintJobsCount();
-        task = self.tasks.apply_async(func, args, kwargs, callback=callback);
-        return MultiprocessThreadTask(name, task, self.logger, args, kwargs);
+        IncrementActiveJobCount()
+        PrintJobsCount()
+        task = self.tasks.apply_async(func, args, kwargs, callback=callback)
+        return MultiprocessThreadTask(name, task, self.logger, args, kwargs)
 
 
     def wait_completion(self):
 
         """Wait for completion of all the tasks in the queue"""
 
-        self.tasks.close()
-        self.tasks.join()
-        self.tasks = multiprocessing.Pool();
+        if hasattr(self, 'tasks'):
+            self.tasks.close()
+            self.tasks.join()
+            del self.tasks
+
+        self.tasks = multiprocessing.Pool()
 
 
 
