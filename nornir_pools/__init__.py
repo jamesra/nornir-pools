@@ -1,9 +1,7 @@
-__all__ = ['processpool', 'threadpool', 'multiprocessthreadpool', 'parallelthreadpool', 'task']
-
-import processpool
-import threadpool
-import multiprocessthreadpool
-import parallelpythonpool
+import nornir_pools.processpool
+import nornir_pools.threadpool
+import nornir_pools.multiprocessthreadpool
+import nornir_pools.parallelpythonpool
 import atexit
 import os
 import sys
