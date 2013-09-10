@@ -11,17 +11,21 @@ import logging
 
 dictKnownPools = {}
 
+
 def GetThreadPool(Poolname=None, num_threads=None):
     '''Get or create a thread pool using vanilla python threads'''
     return __CreatePool(threadpool.Thread_Pool, Poolname, num_threads)
+
 
 def GetMultithreadingPool(Poolname=None, num_threads=None):
     '''Get or create a thread pool to execute threads in other processes using the multiprocessing library'''
     return __CreatePool(multiprocessthreadpool.MultiprocessThread_Pool, Poolname, num_threads)
 
+
 def GetProcessPool(Poolname=None, num_threads=None):
     '''Get or create a pool to invoke shell command processes'''
     return __CreatePool(processpool.Process_Pool, Poolname, num_threads)
+
 
 def GetParallelPythonPool(Poolname=None, num_threads=None):
     '''Get or create a pool to invoke shell command processes on a cluster using parallel python'''
@@ -47,14 +51,18 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None):
 
     return pool
 
+
 def GetGlobalProcessPool():
     return GetProcessPool("Global local process pool")
+
 
 def GetGlobalClusterPool():
     return GetParallelPythonPool("Global cluster pool")
 
+
 def GetGlobalThreadPool():
     return GetThreadPool("Global local thread pool")
+
 
 def GetGlobalMultithreadingPool():
     '''Threads based on pythons multiprocess library which places each thread in a seperate process to avoid the GIL'''
@@ -62,6 +70,7 @@ def GetGlobalMultithreadingPool():
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
 __LastConsoleWrite = datetime.datetime.utcnow()
+
 
 def __EclipseConsoleWrite(s, newline=False):
     s = s.replace('\b', '');
