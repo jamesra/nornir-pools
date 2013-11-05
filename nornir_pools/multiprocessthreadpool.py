@@ -120,6 +120,10 @@ class MultiprocessThreadTask():
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
             return None
 
+    @property
+    def iscompleted(self):
+        return self.asyncresult.ready()
+
 class MultiprocessThread_Pool:
 
     """Pool of threads consuming tasks from a queue"""

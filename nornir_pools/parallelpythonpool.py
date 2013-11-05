@@ -20,12 +20,14 @@ NextGroupName = 0
 JobCountLock = Lock()
 ActiveJobCount = 0
 
+
 def IncrementActiveJobCount():
     global JobCountLock
     global ActiveJobCount
     JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount + 1
     JobCountLock.release()
+
 
 def DecrementActiveJobCount():
     global JobCountLock
@@ -34,11 +36,13 @@ def DecrementActiveJobCount():
     ActiveJobCount = ActiveJobCount - 1
     JobCountLock.release()
 
+
 def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount)
     JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
     pools.PrintProgressUpdate(JobQText)
+
 
 class CTask(task.Task):
 
@@ -66,6 +70,7 @@ class CTask(task.Task):
         else:
             return None
 
+
 def RemoteWorkerProcess(cmd, kwargs):
 
      entry = {}
@@ -88,6 +93,7 @@ def RemoteWorkerProcess(cmd, kwargs):
         sys.stderr.write(error_message)
 
      return entry
+
 
 class ParallelPythonProcess_Pool:
 
