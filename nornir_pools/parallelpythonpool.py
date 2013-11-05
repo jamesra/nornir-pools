@@ -99,22 +99,42 @@ class ParallelPythonProcess_Pool:
 
     """Pool of threads consuming tasks from a queue"""
 
+    @property
+    def server(self):
+        if self._server is None:
+            self._server = pp.Server(ppservers=("*",))
+
+            pools.pprint("Creating server pool, wait three seconds for other servers to respond")
+            time.sleep(3)
+
+            self._server.print_stats()
+
+        return self._server
+
     def __init__(self, num_threads = None):
 
-        self.server = pp.Server(ppservers = ("*",))
+        self._server = None
+#
+#         self.server = pp.Server(ppservers = ("*",))
+#
+#
+#         self.server.print_stats()
 
-        pools.pprint("Wait three seconds for other servers to respond")
-        time.sleep(3)
-        self.server.print_stats()
+#     def __del__(self):
+#
+#         if not self.server is None:
+#             self.server.wait()
+#             self.server.print_stats()
+#             self.server.destroy()
+#             self.server = None
 
-    def __del__(self):
+    def Shutdown(self):
 
-        if not self.server is None:
-            self.server.wait()
-            self.server.print_stats()
-            self.server.destroy()
-            self.server = None
+        self.wait_completion()
 
+        if not self._server is None:
+            self._server.destroy()
+            self._server = None
 
     @property
     def ActiveTasks(self):
@@ -154,9 +174,9 @@ class ParallelPythonProcess_Pool:
 
         """Wait for completion of all the tasks in the queue"""
 
-        self.server.print_stats()
-
-        self.server.wait()
+        if not self._server is None:
+            self.server.wait()
+            self.server.print_stats()
 
 
 

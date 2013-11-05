@@ -128,6 +128,13 @@ class MultiprocessThread_Pool:
 
     """Pool of threads consuming tasks from a queue"""
 
+    @property 
+    def tasks(self):
+        if self._tasks is None:
+            self._tasks = NonDaemonPool()
+
+        return self._tasks
+
     def __init__(self, num_threads=None):
         self.shutdown_event = threading.Event()
         self.logger = logging.getLogger('Multithreading Pool')
@@ -135,15 +142,19 @@ class MultiprocessThread_Pool:
 
         # self.manager =  multiprocessing.Manager()
         # self.tasks = multiprocessing.Pool()
-        self.tasks = NonDaemonPool()
+        self._tasks = None
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
-    def __del__(self):
+    def Shutdown(self):
+        self.wait_completion()
 
-        if hasattr(self, 'tasks'):
-            self.tasks.close()
-            self.tasks.join()
-            del self.tasks
+
+#     def __del__(self):
+#
+#         if hasattr(self, 'tasks'):
+#             self.tasks.close()
+#             self.tasks.join()
+#             self._tasks = None
 
 
     def add_task(self, name, func, *args, **kwargs):
@@ -163,9 +174,6 @@ class MultiprocessThread_Pool:
         if hasattr(self, 'tasks'):
             self.tasks.close()
             self.tasks.join()
-            del self.tasks
-
-        self.tasks = multiprocessing.Pool()
-
+            self._tasks = None
 
 

@@ -137,10 +137,12 @@ def ClosePools():
 
     for (key, pool) in dictKnownPools.items():
         sprint("Waiting on pool: " + key)
-        pool.wait_completion()
+        pool.Shutdown()
 
-    knownPoolKeys = dictKnownPools.keys()
-    for key in knownPoolKeys:
-        del dictKnownPools[key]
+    dictKnownPools.clear()
+
+    # knownPoolKeys = dictKnownPools.keys()
+    # for key in knownPoolKeys:
+    #    del dictKnownPools[key]
 
 atexit.register(ClosePools)

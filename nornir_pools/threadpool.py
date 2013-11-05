@@ -143,14 +143,22 @@ class Thread_Pool:
         self.Threads = []
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
-    def __del__(self):
-    	self.wait_completion()
-        # Close all of our threads
-        self.shutdown_event.set()
+	def Shutdown(self):
+		self.wait_completion()
+		self.shutdown_event.set()
+		self.Threads = []
 
-        self.Threads = []
-
-        time.sleep(Worker.WaitTime + 1)
+		# Give threads time to die gracefully
+		time.sleep(Worker.WaitTime + 1)
+#
+#     def __del__(self):
+#     	self.wait_completion()
+#         # Close all of our threads
+#         self.shutdown_event.set()
+#
+#         self.Threads = []
+#
+#         time.sleep(Worker.WaitTime + 1)
 
     def __keep_alive_thread_func(self):
 
