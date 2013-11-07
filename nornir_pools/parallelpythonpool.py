@@ -111,7 +111,7 @@ class ParallelPythonProcess_Pool:
 
         return self._server
 
-    def __init__(self, num_threads = None):
+    def __init__(self, num_threads=None):
 
         self._server = None
 #
@@ -164,7 +164,7 @@ class ParallelPythonProcess_Pool:
         NextGroupName = NextGroupName + 1
 
         taskObj = CTask(name, args=None, kwargs=kwargs)
-        self.server.submit(RemoteWorkerProcess, (func, kwargs), callback = taskObj.callback, globals = globals(), group = str(NextGroupName), modules = ('subprocess', 'sys'))
+        self.server.submit(RemoteWorkerProcess, (func, kwargs), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
 
         PrintJobsCount()
 

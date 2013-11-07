@@ -128,7 +128,7 @@ class MultiprocessThread_Pool:
 
     """Pool of threads consuming tasks from a queue"""
 
-    @property 
+    @property
     def tasks(self):
         if self._tasks is None:
             self._tasks = NonDaemonPool()
