@@ -177,9 +177,8 @@ class ParallelPythonProcess_Pool:
 
         return self.server.get_active_nodes()
 
-    def add_func(self, name, func, *args, **kwargs):
-
-        """Add a function to the queue, args are passed directly to subprocess.Popen"""
+    def add_task(self, name, func, *args, **kwargs):
+        """Add a function to be invoked on the cluster"""
 
         global NextGroupName
 
@@ -198,7 +197,7 @@ class ParallelPythonProcess_Pool:
 
         return taskObj
 
-    def add_task(self, name, func, *args, **kwargs):
+    def add_process(self, name, func, *args, **kwargs):
         """Add a process to be invoked to the queue, args are passed directly to subprocess.Popen"""
 
         global NextGroupName

@@ -213,7 +213,7 @@ class TestProcessPool(unittest.TestCase):
         tasks = []
         for i in range(1, numTasksInTest):
             cmd = "echo %d && exit" % i
-            task = PPool.add_task(str(i), cmd, shell=True)
+            task = PPool.add_process(str(i), cmd, shell=True)
             tasks.append(task)
 
         Sum = 0
@@ -245,7 +245,7 @@ class TestClusterPool(unittest.TestCase):
         tasks = []
         for i in range(1, numTasksInTest):
             cmd = "echo %d && exit" % i
-            task = PPool.add_task(str(i), cmd)
+            task = PPool.add_process(str(i), cmd)
             tasks.append(task)
 
         Sum = 0
@@ -271,7 +271,7 @@ class TestClusterPool(unittest.TestCase):
 #        tasks = []
 #        for i in range(1,numTasksInTest):
 #            cmd = "echo %d && exit" % i
-#            PPool.add_task(str(i), cmd, shell=True)
+#            PPool.add_process(str(i), cmd, shell=True)
 #            tasks = i
 #
 #        PPool.wait_completion()
