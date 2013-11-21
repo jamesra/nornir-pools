@@ -157,7 +157,7 @@ class Process_Pool:
     def __keep_alive_thread_func(self):
         self.tasks.join()
 
-    def add_task(self, name, args, **kwargs):
+    def add_process(self, name, args, **kwargs):
         """Add a task to the queue, args are passed directly to subprocess.Popen"""
 
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
