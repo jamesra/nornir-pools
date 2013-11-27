@@ -192,6 +192,3 @@ class Process_Pool:
         """Wait for completion of all the tasks in the queue"""
 
         self.tasks.join()
-
-
-

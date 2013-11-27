@@ -53,6 +53,38 @@ def ReadFileWithDelay(path, number):
 
         return ReadFile(path, number)
 
+def RaiseException(msg=None):
+    if msg is None:
+        msg = ""
+
+    raise Exception(msg)
+
+
+def VerifyExceptionBehaviour(test, pool):
+    '''Ensure a pool handles an exception as expected'''
+    ExceptionFound = False
+    exceptText = "Intentionally Raised exception in thread test"
+    try:
+        task = pool.add_task(exceptText, RaiseException, exceptText)
+        task.wait_return()
+    except Exception as e:
+        print "Correctly found exception in thread\n" + str(e)
+        ExceptionFound = True
+        pass
+
+    test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread")
+
+    try:
+        task = pool.add_task(exceptText, RaiseException, exceptText)
+        task.wait()
+    except Exception as e:
+        print "Correctly found exception in thread\n" + str(e)
+        ExceptionFound = True
+        pass
+
+    test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
+
+
 
 class PoolTestBase(unittest.TestCase):
 
@@ -155,6 +187,9 @@ class TestThreadPool(TestThreadPoolBase):
         # Create a 100 threads and have them create files
         TPool = pools.GetGlobalThreadPool()
         self.assertIsNotNone(TPool)
+
+        VerifyExceptionBehaviour(self, TPool)
+
         self.runOnPool(TPool)
 
         TPool = pools.GetThreadPool("Test local thread pool")
@@ -175,11 +210,14 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
         TPool = pools.GetGlobalMultithreadingPool()
         self.assertIsNotNone(TPool)
 
+        VerifyExceptionBehaviour(self, TPool)
+
         self.runOnPool(TPool)
 
         TPool = pools.GetMultithreadingPool("Test multithreading pool")
         self.assertIsNotNone(TPool)
         self.runOnPool(TPool)
+
 
 class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
     ''' Same as TestThreadPool, but the functions call sleep for random amounts of time'''
