@@ -21,6 +21,7 @@ class Task(object):
         """Wait for task to complete, does not return a value"""
 
         self.completed.wait()
+
         return
 
     @property

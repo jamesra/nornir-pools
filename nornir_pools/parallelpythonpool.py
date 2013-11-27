@@ -75,8 +75,8 @@ class CTask(task.Task):
 
 def RemoteWorkerProcess(cmd, args, kwargs):
 
-     entry = {}
-     try:
+    entry = {}
+    try:
         proc = subprocess.Popen(cmd, *args, **kwargs)
         returned_value = proc.communicate(input)
         entry['returned_value'] = returned_value
@@ -85,7 +85,7 @@ def RemoteWorkerProcess(cmd, args, kwargs):
         entry['returncode'] = proc.returncode
         proc = None
 
-     except Exception as e:
+    except Exception as e:
 
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
@@ -94,25 +94,25 @@ def RemoteWorkerProcess(cmd, args, kwargs):
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
         sys.stderr.write(error_message)
-     finally:
+    finally:
         return entry
 
 
 def RemoteFunction(func, fargs):
 
-     entry = {}
+    entry = {}
 
-     try:
-         args = fargs[0]
-         kwargs = fargs[1]
-         if len(args) > 0:
-             retval = func(*args, **kwargs)
-         else:
-             retval = func(**kwargs)
-         entry['returned_value'] = retval
-         entry['stdoutdata'] = retval
+    try:
+        args = fargs[0]
+        kwargs = fargs[1]
+        if len(args) > 0:
+            retval = func(*args, **kwargs)
+        else:
+            retval = func(**kwargs)
+        entry['returned_value'] = retval
+        entry['stdoutdata'] = retval
 
-     except Exception as e:
+    except Exception as e:
         entry['returned_value'] = None
         entry['returncode'] = -1
 
@@ -122,7 +122,7 @@ def RemoteFunction(func, fargs):
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
         sys.stderr.write(error_message)
-     finally:
+    finally:
         return entry
 
 
@@ -228,6 +228,3 @@ class ParallelPythonProcess_Pool:
         if not self._server is None:
             self.server.wait()
             self.server.print_stats()
-
-
-

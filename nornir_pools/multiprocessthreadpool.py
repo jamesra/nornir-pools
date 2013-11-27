@@ -72,6 +72,10 @@ def callback(result):
     DecrementActiveJobCount()
     PrintJobsCount()
 
+def callbackontaskfail(task):
+    '''This is manually invoked by the task when a thread fails to complete'''
+    DecrementActiveJobCount()
+    PrintJobsCount()
 
 class NoDaemonProcess(multiprocessing.Process):
 
@@ -107,6 +111,7 @@ class MultiprocessThreadTask():
             return retval
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            callbackontaskfail(self)
             return None
 
     def wait(self):
@@ -118,6 +123,8 @@ class MultiprocessThreadTask():
             return
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            callbackontaskfail(self)
+            self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation
             return None
 
     @property
@@ -175,5 +182,3 @@ class MultiprocessThread_Pool:
             self.tasks.close()
             self.tasks.join()
             self._tasks = None
-
-
