@@ -48,19 +48,25 @@ class CTask(task.Task):
 
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
+        DecrementActiveJobCount()
 
+        PrintJobsCount()
+        
         if not args[0] is None:
             assert(isinstance(args[0], dict))
             self.__dict__.update(args[0])
 
         if 'error_message' in self.__dict__:
-            sys.stderr.write(self.error_message)
-
-        DecrementActiveJobCount()
-
-        PrintJobsCount()
+            sys.stderr.write(self.error_message)        
 
         self.completed.set()
+        
+    def wait(self):
+        self.completed.wait()
+        
+        if hasattr(self, 'exception'):
+            if not self.exception is None:
+                raise self.exception
 
     def wait_return(self):
         self.wait()
@@ -90,10 +96,11 @@ def RemoteWorkerProcess(cmd, args, kwargs):
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
         entry['exception'] = e
+        entry['returncode'] = -1
 
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
-        sys.stderr.write(error_message)
+        #sys.stderr.write(error_message)
     finally:
         return entry
 
@@ -115,13 +122,14 @@ def RemoteFunction(func, fargs):
     except Exception as e:
         entry['returned_value'] = None
         entry['returncode'] = -1
+        entry['exception'] = e
 
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
-        sys.stderr.write(error_message)
+        #sys.stderr.write(error_message)
     finally:
         return entry
 
