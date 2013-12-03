@@ -46,9 +46,25 @@ def PrintJobsCount():
 
 class CTask(task.Task):
 
+    @property
+    def server(self):
+        return self._server
+
+    @property
+    def groupname(self):
+        return self._groupname
+
+    def __init__(self, server, groupname, *args, **kwargs):
+        super(CTask, self).__init__(*args, **kwargs)
+
+        self._server = server
+        self._groupname = groupname
+        self._callback_reached = False
+
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
 
+        assert(len(args) > 0)
         if not args[0] is None:
             assert(isinstance(args[0], dict))
             self.__dict__.update(args[0])
@@ -62,6 +78,22 @@ class CTask(task.Task):
 
         self.completed.set()
 
+    def wait(self):
+        self.server.wait(self.groupname)
+
+        self.completed.wait()
+#        super(CTask, self).wait()
+
+        # PP is a bit strange in that the callback only occurs if the remote process does not raise an exception
+        # if not self.completed.is_set():
+        #    self.callback()
+
+        # If we failed the call.  Check for an exception and raise if present
+        if hasattr(self, 'exception'):
+            raise self.exception
+        elif self.returncode < 0:
+            raise Exception("Negative return code from task but no exception detail provided")
+
     def wait_return(self):
         self.wait()
 
@@ -69,8 +101,6 @@ class CTask(task.Task):
             return self.stdoutdata
         else:
             return None
-
-
 
 
 def RemoteWorkerProcess(cmd, args, kwargs):
@@ -90,6 +120,7 @@ def RemoteWorkerProcess(cmd, args, kwargs):
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
         entry['exception'] = e
+        entry['returncode'] = -1
 
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
@@ -111,10 +142,12 @@ def RemoteFunction(func, fargs):
             retval = func(**kwargs)
         entry['returned_value'] = retval
         entry['stdoutdata'] = retval
+        entry['returncode'] = 0
 
     except Exception as e:
         entry['returned_value'] = None
         entry['returncode'] = -1
+        entry['exception'] = e
 
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
@@ -188,10 +221,10 @@ class ParallelPythonProcess_Pool:
 
         IncrementActiveJobCount()
 
-        NextGroupName = NextGroupName + 1
-
-        taskObj = CTask(name, args=args, kwargs=kwargs)
+        taskObj = CTask(self.server, NextGroupName, name, args=args, kwargs=kwargs)
         self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('traceback', 'subprocess', 'sys'))
+
+        NextGroupName += 1
 
         PrintJobsCount()
 
@@ -212,10 +245,10 @@ class ParallelPythonProcess_Pool:
         kwargs['stderr'] = subprocess.PIPE
         kwargs['shell'] = True
 
-        NextGroupName = NextGroupName + 1
-
-        taskObj = CTask(name, args=args, kwargs=kwargs)
+        taskObj = CTask(self.server, NextGroupName, name, args=args, kwargs=kwargs)
         self.server.submit(RemoteWorkerProcess, (func, args, kwargs), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
+
+        NextGroupName += 1
 
         PrintJobsCount()
 

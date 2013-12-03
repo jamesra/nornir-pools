@@ -57,7 +57,10 @@ def RaiseException(msg=None):
     if msg is None:
         msg = ""
 
-    raise Exception(msg)
+    raise IntentionalPoolException(msg)
+
+class IntentionalPoolException(Exception):
+    pass
 
 
 def VerifyExceptionBehaviour(test, pool):
@@ -67,7 +70,7 @@ def VerifyExceptionBehaviour(test, pool):
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait_return()
-    except Exception as e:
+    except IntentionalPoolException as e:
         print "Correctly found exception in thread\n" + str(e)
         ExceptionFound = True
         pass
@@ -77,13 +80,62 @@ def VerifyExceptionBehaviour(test, pool):
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait()
-    except Exception as e:
+    except IntentionalPoolException as e:
         print "Correctly found exception in thread\n" + str(e)
         ExceptionFound = True
         pass
 
     test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
 
+
+def runOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
+
+    if CreateFunc is None:
+        CreateFunc = CreateFile
+
+    if ReadFunc is None:
+        ReadFunc = ReadFile
+
+    for i in range(1, numThreadsInTest):
+        TPool.add_task(str(i), CreateFunc, self.TestOutputPath, i)
+
+    TPool.wait_completion()
+
+    tasks = []
+    for i in range(1, numThreadsInTest):
+        ExpectedPath = os.path.join(self.TestOutputPath, TestThreadPool.FilenameTemplate % i)
+        self.assertTrue(os.path.exists(ExpectedPath), "Missing file " + ExpectedPath)
+
+        task = TPool.add_task(str(i), ReadFunc, self.TestOutputPath, i)
+        self.assertIsNotNone(task, "Expected a task returned when calling add_task")
+
+        tasks.append(task)
+
+    Sum = 0
+    for task in tasks:
+
+        val = task.wait_return()
+        self.assertEqual(val, int(task.name))
+
+        Sum = Sum + val
+
+    self.assertEqual(Sum, sum(range(1, numThreadsInTest)), "Testing to ensure each number in test range was created")
+
+    for i in range(1, numThreadsInTest):
+        filename = TestThreadPool.FilenameTemplate % i
+        filenamefullpath = os.path.join(self.TestOutputPath, filename)
+
+        task = TPool.add_task(filenamefullpath, os.remove, filenamefullpath)
+        self.assertIsNotNone(task, "Expected a task returned when calling add_task")
+
+    # Make sure if we wait for a task the task is actually done
+    for task in tasks:
+        val = task.wait()
+        filenamefullpath = task.name
+
+        self.assertFalse(os.path.exists(filenamefullpath), "file undeleted after task reported complete")
+
+    self.assertEqual(0, len(os.listdir(self.TestOutputPath)))
 
 
 class PoolTestBase(unittest.TestCase):
@@ -116,63 +168,13 @@ class PoolTestBase(unittest.TestCase):
             shutil.rmtree(self.TestOutputPath)
 
 
-
 class TestThreadPoolBase(PoolTestBase):
 
     FilenameTemplate = "%04d.txt"
 
-    def runOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
 
-        if CreateFunc is None:
-            CreateFunc = CreateFile
-
-        if ReadFunc is None:
-            ReadFunc = ReadFile
-
-        for i in range(1, numThreadsInTest):
-            TPool.add_task(str(i), CreateFunc, self.TestOutputPath, i)
-
-        TPool.wait_completion()
-
-        tasks = []
-        for i in range(1, numThreadsInTest):
-            ExpectedPath = os.path.join(self.TestOutputPath, TestThreadPool.FilenameTemplate % i)
-            self.assertTrue(os.path.exists(ExpectedPath), "Missing file " + ExpectedPath)
-
-            task = TPool.add_task(str(i), ReadFunc, self.TestOutputPath, i)
-            self.assertIsNotNone(task, "Expected a task returned when calling add_task")
-
-            tasks.append(task)
-
-        Sum = 0
-        for task in tasks:
-
-            val = task.wait_return()
-            self.assertEqual(val, int(task.name))
-
-            Sum = Sum + val
-
-        self.assertEqual(Sum, sum(range(1, numThreadsInTest)), "Testing to ensure each number in test range was created")
-
-
-        for i in range(1, numThreadsInTest):
-            filename = TestThreadPool.FilenameTemplate % i
-            filenamefullpath = os.path.join(self.TestOutputPath, filename)
-
-            task = TPool.add_task(filenamefullpath, os.remove, filenamefullpath)
-            self.assertIsNotNone(task, "Expected a task returned when calling add_task")
-
-        # Make sure if we wait for a task the task is actually done
-        for task in tasks:
-            val = task.wait()
-            filenamefullpath = task.name
-
-            self.assertFalse(os.path.exists(filenamefullpath), "file undeleted after task reported complete")
-
-        self.assertEqual(0, len(os.listdir(self.TestOutputPath)))
-
-    def runTest(self):
-        self.skipTest("TestThreadPoolBase, no test implemented")
+    # def runTest(self):
+    #    self.skipTest("TestThreadPoolBase, no test implemented")
 
 class TestThreadPool(TestThreadPoolBase):
 
@@ -190,11 +192,12 @@ class TestThreadPool(TestThreadPoolBase):
 
         VerifyExceptionBehaviour(self, TPool)
 
-        self.runOnPool(TPool)
+        runOnPool(self, TPool)
 
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
-        self.runOnPool(TPool)
+        runOnPool(self, TPool)
+
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
 
@@ -212,11 +215,11 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
 
         VerifyExceptionBehaviour(self, TPool)
 
-        self.runOnPool(TPool)
+        runOnPool(self, TPool)
 
         TPool = pools.GetMultithreadingPool("Test multithreading pool")
         self.assertIsNotNone(TPool)
-        self.runOnPool(TPool)
+        runOnPool(self, TPool)
 
 
 class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
@@ -227,7 +230,8 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
         TPool = pools.GetGlobalMultithreadingPool()
         self.assertIsNotNone(TPool)
 
-        self.runOnPool(TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+
 
 class TestThreadPoolWithRandomDelay(TestThreadPool):
     ''' Same as TestThreadPool, but the functions call sleep for random amounts of time'''
@@ -237,7 +241,7 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
         TPool = pools.GetGlobalThreadPool()
         self.assertIsNotNone(TPool)
 
-        self.runOnPool(TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
 
 class TestProcessPool(unittest.TestCase):
 
@@ -265,6 +269,20 @@ class TestProcessPool(unittest.TestCase):
 
         self.assertEqual(Sum, sum(range(1, numTasksInTest)), "Testing to ensure each number in test range was created")
 
+class TestClusterPoolFunctions(TestThreadPoolBase):
+
+    def runTest(self):
+        # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
+
+        PPool = pools.GetGlobalClusterPool()
+        self.assertIsNotNone(PPool)
+
+        VerifyExceptionBehaviour(self, PPool)
+
+        runOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+
+        VerifyExceptionBehaviour(self, PPool)
+
 
 class TestClusterPool(unittest.TestCase):
 
@@ -288,7 +306,6 @@ class TestClusterPool(unittest.TestCase):
 
         Sum = 0
         for task in tasks:
-
             val = task.wait_return()
             intval = int(val)
             self.assertEqual(intval, int(task.name))
