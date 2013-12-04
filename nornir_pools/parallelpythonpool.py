@@ -230,7 +230,7 @@ class ParallelPythonProcess_Pool:
 
         return taskObj
 
-    def add_process(self, name, func, *args, **kwargs):
+    def add_process(self, name, func, **kwargs):
         """Add a process to be invoked to the queue, args are passed directly to subprocess.Popen"""
 
         global NextGroupName
@@ -245,8 +245,8 @@ class ParallelPythonProcess_Pool:
         kwargs['stderr'] = subprocess.PIPE
         kwargs['shell'] = True
 
-        taskObj = CTask(self.server, NextGroupName, name, args=args, kwargs=kwargs)
-        self.server.submit(RemoteWorkerProcess, (func, args, kwargs), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
+        taskObj = CTask(self.server, NextGroupName, name,  kwargs=kwargs)
+        self.server.submit(RemoteWorkerProcess, (func, kwargs), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
 
         NextGroupName += 1
 

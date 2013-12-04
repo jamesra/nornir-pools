@@ -138,7 +138,7 @@ class MultiprocessThread_Pool:
     @property
     def tasks(self):
         if self._tasks is None:
-            self._tasks = NonDaemonPool()
+            self._tasks = NonDaemonPool(maxtasksperchild=32)
 
         return self._tasks
 
