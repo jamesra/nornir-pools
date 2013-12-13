@@ -46,9 +46,25 @@ def PrintJobsCount():
 
 class CTask(task.Task):
 
+    @property
+    def server(self):
+        return self._server
+
+    @property
+    def groupname(self):
+        return self._groupname
+
+    def __init__(self, server, groupname, *args, **kwargs):
+        super(CTask, self).__init__(*args, **kwargs)
+
+        self._server = server
+        self._groupname = groupname
+        self._callback_reached = False
+
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
 
+        assert(len(args) > 0)
         if not args[0] is None:
             assert(isinstance(args[0], dict))
             self.__dict__.update(args[0])
@@ -62,6 +78,22 @@ class CTask(task.Task):
 
         self.completed.set()
 
+    def wait(self):
+        self.server.wait(self.groupname)
+
+        self.completed.wait()
+#        super(CTask, self).wait()
+
+        # PP is a bit strange in that the callback only occurs if the remote process does not raise an exception
+        # if not self.completed.is_set():
+        #    self.callback()
+
+        # If we failed the call.  Check for an exception and raise if present
+        if hasattr(self, 'exception'):
+            raise self.exception
+        elif self.returncode < 0:
+            raise Exception("Negative return code from task but no exception detail provided")
+
     def wait_return(self):
         self.wait()
 
@@ -71,11 +103,11 @@ class CTask(task.Task):
             return None
 
 
-def RemoteWorkerProcess(cmd, kwargs):
+def RemoteWorkerProcess(cmd, args, kwargs):
 
-     entry = {}
-     try:
-        proc = subprocess.Popen(cmd, **kwargs)
+    entry = {}
+    try:
+        proc = subprocess.Popen(cmd, *args, **kwargs)
         returned_value = proc.communicate(input)
         entry['returned_value'] = returned_value
         entry['stdoutdata'] = returned_value[0].decode('utf-8')
@@ -83,7 +115,39 @@ def RemoteWorkerProcess(cmd, kwargs):
         entry['returncode'] = proc.returncode
         proc = None
 
-     except Exception as e:
+    except Exception as e:
+
+        # inform operator of the name of the task throwing the exception
+        # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
+        entry['exception'] = e
+        entry['returncode'] = -1
+
+        error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
+        entry['error_message'] = error_message
+        sys.stderr.write(error_message)
+    finally:
+        return entry
+
+
+def RemoteFunction(func, fargs):
+
+    entry = {}
+
+    try:
+        args = fargs[0]
+        kwargs = fargs[1]
+        if len(args) > 0:
+            retval = func(*args, **kwargs)
+        else:
+            retval = func(**kwargs)
+        entry['returned_value'] = retval
+        entry['stdoutdata'] = retval
+        entry['returncode'] = 0
+
+    except Exception as e:
+        entry['returned_value'] = None
+        entry['returncode'] = -1
+        entry['exception'] = e
 
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
@@ -91,8 +155,8 @@ def RemoteWorkerProcess(cmd, kwargs):
         error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
         entry['error_message'] = error_message
         sys.stderr.write(error_message)
-
-     return entry
+    finally:
+        return entry
 
 
 class ParallelPythonProcess_Pool:
@@ -103,6 +167,7 @@ class ParallelPythonProcess_Pool:
     def server(self):
         if self._server is None:
             self._server = pp.Server(ppservers=("*",))
+
 
             pools.pprint("Creating server pool, wait three seconds for other servers to respond")
             time.sleep(3)
@@ -145,9 +210,28 @@ class ParallelPythonProcess_Pool:
 
         return self.server.get_active_nodes()
 
-    def add_task(self, name, func, **kwargs):
+    def add_task(self, name, func, *args, **kwargs):
+        """Add a function to be invoked on the cluster"""
 
-        """Add a task to the queue, args are passed directly to subprocess.Popen"""
+        global NextGroupName
+
+        # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
+        # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
+        # When items are added to the queue we create a new keep_alive_thread as needed
+
+        IncrementActiveJobCount()
+
+        taskObj = CTask(self.server, NextGroupName, name, args=args, kwargs=kwargs)
+        self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('traceback', 'subprocess', 'sys'))
+
+        NextGroupName += 1
+
+        PrintJobsCount()
+
+        return taskObj
+
+    def add_process(self, name, func, **kwargs):
+        """Add a process to be invoked to the queue, args are passed directly to subprocess.Popen"""
 
         global NextGroupName
 
@@ -161,10 +245,10 @@ class ParallelPythonProcess_Pool:
         kwargs['stderr'] = subprocess.PIPE
         kwargs['shell'] = True
 
-        NextGroupName = NextGroupName + 1
-
-        taskObj = CTask(name, args=None, kwargs=kwargs)
+        taskObj = CTask(self.server, NextGroupName, name,  kwargs=kwargs)
         self.server.submit(RemoteWorkerProcess, (func, kwargs), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
+
+        NextGroupName += 1
 
         PrintJobsCount()
 
@@ -177,6 +261,3 @@ class ParallelPythonProcess_Pool:
         if not self._server is None:
             self.server.wait()
             self.server.print_stats()
-
-
-
