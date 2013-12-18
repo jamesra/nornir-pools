@@ -9,7 +9,7 @@ import threading
 
 class Task(object):
 
-    def __init__(self, name, args, kwargs):
+    def __init__(self, name, *args, **kwargs):
 
         self.args = args
         self.kwargs = kwargs

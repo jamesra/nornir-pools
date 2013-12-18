@@ -28,13 +28,13 @@ class ThreadTask(task.Task):
         self._exception = val
 
 
-    def __init__(self, name, func, args, kwargs):
+    def __init__(self, name, func, *args, **kwargs):
 
         self.func = func  # Function to be called when Task is removed from queue
         self.returned_value = None  # The value returned by the executing function
         self._exception = None
 
-        super(ThreadTask, self).__init__(name, args, kwargs)
+        super(ThreadTask, self).__init__(name, *args, **kwargs)
 
     def wait_return(self):
 
@@ -102,7 +102,14 @@ class Worker(threading.Thread):
 
             try:
 
-                entry.returned_value = entry.func(*entry.args, **entry.kwargs)
+                if len(entry.args) > 0 and len(entry.kwargs) > 0:
+                    entry.returned_value = entry.func(*entry.args, **entry.kwargs)
+                elif len(entry.args) > 0 and len(entry.kwargs) == 0:
+                    entry.returned_value = entry.func(*entry.args)
+                elif len(entry.args) == 0 and len(entry.kwargs) > 0:
+                    entry.returned_value = entry.func(**entry.kwargs)
+                else:
+                    entry.returned_value = entry.func()
 
             except Exception, e:
 
@@ -201,7 +208,7 @@ class Thread_Pool(object):
         elif self.keep_alive_thread.is_alive() == False:
             start_keep_alive_thread = True
 
-        entry = ThreadTask(name, func, args, kwargs)
+        entry = ThreadTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
 
         # We start threadpool with no threads, and add threads as the queue grows.

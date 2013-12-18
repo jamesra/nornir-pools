@@ -19,7 +19,20 @@ import nornir_pools as pools
 
 import task
 
+
 class ProcessTask(task.Task):
+
+    def __init__(self, name, func, *args, **kwargs):
+        super(ProcessTask, self).__init__(name, *args, **kwargs)
+        self.cmd = func
+
+    def wait(self):
+        super(ProcessTask, self).wait()
+
+        if hasattr(self, 'exception'):
+            raise self.exception
+        elif self.returncode < 0:
+            raise Exception("Negative return code from task but no exception detail provided")
 
     def wait_return(self):
         self.wait()
@@ -72,7 +85,7 @@ class Worker(threading.Thread):
 
             try:
 
-                proc = subprocess.Popen(entry.args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **entry.kwargs)
+                proc = subprocess.Popen(entry.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *entry.args, **entry.kwargs)
                 entry.returned_value = proc.communicate(input)
                 entry.stdoutdata = entry.returned_value[0].decode('utf-8')
                 entry.stderrdata = entry.returned_value[1].decode('utf-8')
@@ -87,6 +100,14 @@ class Worker(threading.Thread):
                 error_message = "\n*** {0}\n{1}\n{2}\n".format(entry.name, entry.args, traceback.format_exc())
                 self.logger.error(error_message)
                 sys.stderr.write(error_message)
+
+                entry.exception = e
+
+                entry.stdoutdata = None
+                entry.returned_value = None
+                entry.returncode = -1
+                entry.stderrdata = None
+
 
             # calculate finishing time and mark task as completed
 
@@ -157,7 +178,7 @@ class Process_Pool:
     def __keep_alive_thread_func(self):
         self.tasks.join()
 
-    def add_process(self, name, args, **kwargs):
+    def add_process(self, name, func, *args, **kwargs):
         """Add a task to the queue, args are passed directly to subprocess.Popen"""
 
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
@@ -177,7 +198,7 @@ class Process_Pool:
             kwargs = {}
             kwargs['shell'] = True
 
-        entry = ProcessTask(name, args, kwargs)
+        entry = ProcessTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
 
         if start_keep_alive_thread:
