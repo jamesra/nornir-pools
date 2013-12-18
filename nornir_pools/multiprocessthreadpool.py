@@ -94,7 +94,7 @@ class NonDaemonPool(multiprocessing.pool.Pool):
 
 class MultiprocessThreadTask():
 
-    def __init__(self, name, asyncresult, logger, args, kwargs):
+    def __init__(self, name, asyncresult, logger, *args, **kwargs):
 
         self.name = name
         self.args = args
