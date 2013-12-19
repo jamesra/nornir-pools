@@ -1,3 +1,18 @@
+'''
+----------------------------------
+nornir_pools (:mod:`nornir_pools`)
+----------------------------------
+
+nornir_pools aims to provide a consistent interface around four different multi-threading and clustering libraries available to Python.
+
+
+.. automodule:: nornir_pools.task
+   :members:
+.. automodule:: nornir_pools.pool
+   :members:
+
+'''
+
 import nornir_pools.processpool as processpool
 import nornir_pools.threadpool as threadpool
 import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
