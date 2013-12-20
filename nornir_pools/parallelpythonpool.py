@@ -14,6 +14,7 @@ from threading import Lock
 import task
 
 import nornir_pools as pools
+import poolbase
 
 NextGroupName = 0
 
@@ -41,10 +42,10 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount)
     JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-    pools.PrintProgressUpdate(JobQText)
+    pools._PrintProgressUpdate(JobQText)
 
 
-class CTask(task.Task):
+class CTask(task.TaskWithEvent):
 
     @property
     def server(self):
@@ -81,8 +82,8 @@ class CTask(task.Task):
     def wait(self):
         self.server.wait(self.groupname)
 
-        self.completed.wait()
-#        super(CTask, self).wait()
+#        self.completed.wait()
+        super(CTask, self).wait()
 
         # PP is a bit strange in that the callback only occurs if the remote process does not raise an exception
         # if not self.completed.is_set():
@@ -175,7 +176,7 @@ def RemoteFunction(func, fargs):
         return entry
 
 
-class ParallelPythonProcess_Pool:
+class ParallelPythonProcess_Pool(poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
 
@@ -185,7 +186,7 @@ class ParallelPythonProcess_Pool:
             self._server = pp.Server(ppservers=("*",))
 
 
-            pools.pprint("Creating server pool, wait three seconds for other servers to respond")
+            pools._pprint("Creating server pool, wait three seconds for other servers to respond")
             time.sleep(3)
 
             self._server.print_stats()
@@ -209,7 +210,7 @@ class ParallelPythonProcess_Pool:
 #             self.server.destroy()
 #             self.server = None
 
-    def Shutdown(self):
+    def shutdown(self):
 
         self.wait_completion()
 

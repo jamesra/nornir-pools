@@ -10,9 +10,26 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
+   
+   api
+   examples
+   
+About
+-----
 
-.. automodule:: nornir_pools 
-   :
+nornir_pools attempts to provide a simple consistent interface around four different threading and clustering options available to Python developers:
+
+* threading
+* multiprocessing 
+* subprocess
+* Parallel Python (pp) for use on clusters
+
+Installation
+------------
+
+nornir_pools is pure python library available via Github::
+
+  pip install git+https://github.com/nornir/nornir-pools.git --upgrade
 
 Indices and tables
 ==================

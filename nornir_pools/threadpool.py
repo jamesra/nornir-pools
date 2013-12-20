@@ -15,9 +15,10 @@ import logging
 import task
 
 import nornir_pools as pools
+import poolbase
 
 
-class ThreadTask(task.Task):
+class ThreadTask(task.TaskWithEvent):
 
     @property
     def exception(self):
@@ -50,7 +51,7 @@ class ThreadTask(task.Task):
 
         """Wait for task to complete, does not return a value"""
 
-        self.completed.wait()
+        super(ThreadTask, self).wait()
 
         if not self.exception is None:
             raise self.exception
@@ -83,7 +84,7 @@ class Worker(threading.Thread):
             except:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
-                    # sprint ("Queue Empty, exiting worker thread")
+                    # _sprint ("Queue Empty, exiting worker thread")
                     return
                 else:
                     continue
@@ -95,8 +96,8 @@ class Worker(threading.Thread):
             # print notification
 
             self.logger.info("+++ {0}".format(entry.name))
-            # sprint("+++ {0}".format(entry.name))
-            # sprint("+")
+            # _sprint("+++ {0}".format(entry.name))
+            # _sprint("+")
 
             # do it!
 
@@ -150,12 +151,12 @@ class Worker(threading.Thread):
 
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-                pools.PrintProgressUpdate(JobQText)
+                pools._PrintProgressUpdate(JobQText)
 
             self.tasks.task_done()
 
 
-class Thread_Pool(object):
+class Thread_Pool(poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
 
@@ -173,7 +174,7 @@ class Thread_Pool(object):
         self.Threads = []
         return
 
-    def Shutdown(self):
+    def shutdown(self):
         self.wait_completion()
         self.shutdown_event.set()
         self.Threads = []
