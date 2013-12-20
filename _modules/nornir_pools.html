@@ -34,6 +34,9 @@
         <li class="right" style="margin-right: 10px">
           <a href="../genindex.html" title="General Index"
              accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
         <li><a href="../index.html">Nornir Pools 0.9 documentation</a> &raquo;</li>
           <li><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
       </ul>
@@ -103,24 +106,24 @@
 <span class="n">dictKnownPools</span> <span class="o">=</span> <span class="p">{}</span>
 
 
-<div class="viewcode-block" id="GetThreadPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetThreadPool">[docs]</a><span class="k">def</span> <span class="nf">GetThreadPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="GetThreadPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetThreadPool">[docs]</a><span class="k">def</span> <span class="nf">GetThreadPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Get or create a specific thread pool using vanilla python threads    </span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">__CreatePool</span><span class="p">(</span><span class="n">threadpool</span><span class="o">.</span><span class="n">Thread_Pool</span><span class="p">,</span> <span class="n">Poolname</span><span class="p">,</span> <span class="n">num_threads</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetMultithreadingPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetMultithreadingPool">[docs]</a><span class="k">def</span> <span class="nf">GetMultithreadingPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="GetMultithreadingPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetMultithreadingPool">[docs]</a><span class="k">def</span> <span class="nf">GetMultithreadingPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Get or create a specific thread pool to execute threads in other processes on the same computer using the multiprocessing library&#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">__CreatePool</span><span class="p">(</span><span class="n">multiprocessthreadpool</span><span class="o">.</span><span class="n">MultiprocessThread_Pool</span><span class="p">,</span> <span class="n">Poolname</span><span class="p">,</span> <span class="n">num_threads</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetProcessPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetProcessPool">[docs]</a><span class="k">def</span> <span class="nf">GetProcessPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="GetProcessPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetProcessPool">[docs]</a><span class="k">def</span> <span class="nf">GetProcessPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Get or create a specific pool to invoke shell command processes on the same computer using the subprocess module&#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">__CreatePool</span><span class="p">(</span><span class="n">processpool</span><span class="o">.</span><span class="n">Process_Pool</span><span class="p">,</span> <span class="n">Poolname</span><span class="p">,</span> <span class="n">num_threads</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetParallelPythonPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetParallelPythonPool">[docs]</a><span class="k">def</span> <span class="nf">GetParallelPythonPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="viewcode-block" id="GetParallelPythonPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetParallelPythonPool">[docs]</a><span class="k">def</span> <span class="nf">GetParallelPythonPool</span><span class="p">(</span><span class="n">Poolname</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">num_threads</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel python&#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">__CreatePool</span><span class="p">(</span><span class="n">parallelpythonpool</span><span class="o">.</span><span class="n">ParallelPythonProcess_Pool</span><span class="p">,</span> <span class="n">Poolname</span><span class="p">,</span> <span class="n">num_threads</span><span class="p">)</span>
 
@@ -146,28 +149,28 @@
 
 
 
-<div class="viewcode-block" id="GetGlobalProcessPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetGlobalProcessPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalProcessPool</span><span class="p">():</span>
+<div class="viewcode-block" id="GetGlobalProcessPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetGlobalProcessPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalProcessPool</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Common pool for processes on the local machine</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">GetProcessPool</span><span class="p">(</span><span class="s">&quot;Global local process pool&quot;</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetGlobalClusterPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetGlobalClusterPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalClusterPool</span><span class="p">():</span>
+<div class="viewcode-block" id="GetGlobalClusterPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetGlobalClusterPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalClusterPool</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Get the common pool for placing tasks on the cluster</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">GetParallelPythonPool</span><span class="p">(</span><span class="s">&quot;Global cluster pool&quot;</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetGlobalThreadPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetGlobalThreadPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalThreadPool</span><span class="p">():</span>
+<div class="viewcode-block" id="GetGlobalThreadPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetGlobalThreadPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalThreadPool</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Common pool for thread based tasks</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="k">return</span> <span class="n">GetThreadPool</span><span class="p">(</span><span class="s">&quot;Global local thread pool&quot;</span><span class="p">)</span>
 
 </div>
-<div class="viewcode-block" id="GetGlobalMultithreadingPool"><a class="viewcode-back" href="../index.html#nornir_pools.GetGlobalMultithreadingPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalMultithreadingPool</span><span class="p">():</span>
+<div class="viewcode-block" id="GetGlobalMultithreadingPool"><a class="viewcode-back" href="../api.html#nornir_pools.GetGlobalMultithreadingPool">[docs]</a><span class="k">def</span> <span class="nf">GetGlobalMultithreadingPool</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Common pool for multithreading module tasks, threads run in different python processes to work around the global interpreter lock</span>
 <span class="sd">    &#39;&#39;&#39;</span>
@@ -237,7 +240,7 @@
         <span class="n">__ConsoleWrite</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="ClosePools"><a class="viewcode-back" href="../index.html#nornir_pools.ClosePools">[docs]</a><span class="k">def</span> <span class="nf">ClosePools</span><span class="p">():</span>
+<div class="viewcode-block" id="ClosePools"><a class="viewcode-back" href="../api.html#nornir_pools.ClosePools">[docs]</a><span class="k">def</span> <span class="nf">ClosePools</span><span class="p">():</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Shutdown all pools.</span>
 <span class="sd">    </span>
@@ -283,6 +286,9 @@
         <li class="right" style="margin-right: 10px">
           <a href="../genindex.html" title="General Index"
              >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
         <li><a href="../index.html">Nornir Pools 0.9 documentation</a> &raquo;</li>
           <li><a href="index.html" >Module code</a> &raquo;</li> 
       </ul>

@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>API &mdash; Nornir Pools 0.9 documentation</title>
+    <title>Use &mdash; Nornir Pools 0.9 documentation</title>
     
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -36,6 +36,9 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
           <a href="examples.html" title="Examples"
              accesskey="N">next</a> |</li>
         <li class="right" >
@@ -51,12 +54,17 @@
           <div class="body">
             
   <div class="section" id="module-nornir_pools">
-<span id="api"></span><h1>API<a class="headerlink" href="#module-nornir_pools" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="nornir-pools">
-<h2>nornir_pools<a class="headerlink" href="#nornir-pools" title="Permalink to this headline">¶</a></h2>
-<p>nornir_pools aims to provide a consistent interface around four different multi-threading and clustering libraries available to Python.</p>
+<span id="use"></span><h1>Use<a class="headerlink" href="#module-nornir_pools" title="Permalink to this headline">¶</a></h1>
+<p>To use pools the user</p>
+<ol class="arabic simple">
+<li>Create a pool</li>
+<li>add a task or process to the pool</li>
+<li>save the task object returned</li>
+<li>call wait or wait_return on the task object to fetch the output or raise exceptions</li>
+</ol>
+<p>Steps 3 and 4 can be skipped if output is not required.  In this case wait_completion can be called on the pool to delay until all tasks have completed.  Note that in this pattern exceptions may be lost.</p>
 <div class="section" id="pool-creation">
-<h3>Pool Creation<a class="headerlink" href="#pool-creation" title="Permalink to this headline">¶</a></h3>
+<h2>Pool Creation<a class="headerlink" href="#pool-creation" title="Permalink to this headline">¶</a></h2>
 <p>Pool creation functions share a common signature</p>
 <dl class="function">
 <dt>
@@ -106,6 +114,10 @@
 <dd><p>Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel python</p>
 </dd></dl>
 
+</div>
+<div class="section" id="global-pools">
+<h2>Global pools<a class="headerlink" href="#global-pools" title="Permalink to this headline">¶</a></h2>
+<p>Most callers will not care about getting a specific pool.  These functions always return the same pool.</p>
 <dl class="function">
 <dt id="nornir_pools.GetGlobalThreadPool">
 <tt class="descclassname">nornir_pools.</tt><tt class="descname">GetGlobalThreadPool</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/nornir_pools.html#GetGlobalThreadPool"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#nornir_pools.GetGlobalThreadPool" title="Permalink to this definition">¶</a></dt>
@@ -132,7 +144,7 @@
 
 </div>
 <div class="section" id="module-nornir_pools.poolbase">
-<span id="pool-objects"></span><h3>Pool Objects<a class="headerlink" href="#module-nornir_pools.poolbase" title="Permalink to this headline">¶</a></h3>
+<span id="pool-objects"></span><h2>Pool Objects<a class="headerlink" href="#module-nornir_pools.poolbase" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="nornir_pools.poolbase.PoolBase">
 <em class="property">class </em><tt class="descclassname">nornir_pools.poolbase.</tt><tt class="descname">PoolBase</tt><big>(</big><em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/nornir_pools/poolbase.html#PoolBase"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#nornir_pools.poolbase.PoolBase" title="Permalink to this definition">¶</a></dt>
@@ -201,7 +213,7 @@
 
 </div>
 <div class="section" id="task-objects">
-<h3>Task Objects<a class="headerlink" href="#task-objects" title="Permalink to this headline">¶</a></h3>
+<h2>Task Objects<a class="headerlink" href="#task-objects" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="nornir_pools.task.Task">
 <em class="property">class </em><tt class="descclassname">nornir_pools.task.</tt><tt class="descname">Task</tt><big>(</big><em>name</em>, <em>*args</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/nornir_pools/task.html#Task"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#nornir_pools.task.Task" title="Permalink to this definition">¶</a></dt>
@@ -218,7 +230,7 @@
 
 </div>
 <div class="section" id="pool-destruction">
-<h3>Pool Destruction<a class="headerlink" href="#pool-destruction" title="Permalink to this headline">¶</a></h3>
+<h2>Pool Destruction<a class="headerlink" href="#pool-destruction" title="Permalink to this headline">¶</a></h2>
 <p>It is not necessary to perform any cleanup.  Functions to delete pools would not be hard to add.  ClosePools is called automatically at script termination by atexit</p>
 <dl class="function">
 <dt id="nornir_pools.ClosePools">
@@ -226,7 +238,6 @@
 <dd><p>Shutdown all pools.</p>
 </dd></dl>
 
-</div>
 </div>
 </div>
 
@@ -238,14 +249,12 @@
         <div class="sphinxsidebarwrapper">
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
-<li><a class="reference internal" href="#">API</a><ul>
-<li><a class="reference internal" href="#nornir-pools">nornir_pools</a><ul>
+<li><a class="reference internal" href="#">Use</a><ul>
 <li><a class="reference internal" href="#pool-creation">Pool Creation</a></li>
+<li><a class="reference internal" href="#global-pools">Global pools</a></li>
 <li><a class="reference internal" href="#module-nornir_pools.poolbase">Pool Objects</a></li>
 <li><a class="reference internal" href="#task-objects">Task Objects</a></li>
 <li><a class="reference internal" href="#pool-destruction">Pool Destruction</a></li>
-</ul>
-</li>
 </ul>
 </li>
 </ul>
@@ -284,6 +293,9 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
         <li class="right" >
           <a href="examples.html" title="Examples"
              >next</a> |</li>
