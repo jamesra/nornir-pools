@@ -1,3 +1,63 @@
+''' 
+
+The use pattern for pools is:
+
+1. Create a pool
+2. add a task or process to the pool
+3. save the task object returned
+4. call wait or wait_return on the task object to fetch the output or raise exceptions
+
+Steps 3 and 4 can be skipped if output is not required.  In this case wait_completion can be called on the pool to delay until all tasks have completed.  Note that in this pattern exceptions may be lost.
+ 
+Pool Creation
+-------------
+
+Pool creation functions share a common signature
+
+.. py:function:: Get<X>Pool([Poolname=None, num_threads=None)
+   
+   Return a pool of X type, listed below.  Repeated calls using the same name returns the same pool
+   
+   :param str Poolname: Name of the pool to get or create.  Passing "None" returns the global pool
+   :param int num_threads: Number of tasks allowed to execute concurrently.  Not honored by all pools at this time
+   
+   :returns: object derived from PoolBase
+   :rtype: PoolBase
+    
+.. autofunction:: GetThreadPool
+.. autofunction:: GetMultithreadingPool
+.. autofunction:: GetProcessPool
+.. autofunction:: GetParallelPythonPool
+
+Global pools
+------------
+
+Most callers will not care about getting a specific pool.  These functions always return the same pool.
+
+.. autofunction:: GetGlobalThreadPool
+.. autofunction:: GetGlobalMultithreadingPool
+.. autofunction:: GetGlobalProcessPool
+.. autofunction:: GetGlobalClusterPool
+
+ 
+Pool Objects
+------------
+.. automodule:: nornir_pools.poolbase
+   :members:
+   
+Task Objects
+------------
+.. autoclass:: nornir_pools.task.Task
+
+Pool Destruction
+----------------
+
+It is not necessary to perform any cleanup.  Functions to delete pools would not be hard to add.  ClosePools is called automatically at script termination by atexit
+
+.. autofunction:: nornir_pools.ClosePools
+
+'''
+
 import nornir_pools.processpool as processpool
 import nornir_pools.threadpool as threadpool
 import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
