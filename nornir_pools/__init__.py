@@ -1,5 +1,7 @@
 ''' 
 
+nornir_pools aims to provide a consistent interface around four different multi-threading and clustering libraries available to Python.
+
 The use pattern for pools is:
 
 1. Create a pool
@@ -73,22 +75,24 @@ dictKnownPools = {}
 
 
 def GetThreadPool(Poolname=None, num_threads=None):
-    '''Get or create a thread pool using vanilla python threads'''
+    '''
+    Get or create a specific thread pool using vanilla python threads    
+    '''
     return __CreatePool(threadpool.Thread_Pool, Poolname, num_threads)
 
 
 def GetMultithreadingPool(Poolname=None, num_threads=None):
-    '''Get or create a thread pool to execute threads in other processes using the multiprocessing library'''
+    '''Get or create a specific thread pool to execute threads in other processes on the same computer using the multiprocessing library'''
     return __CreatePool(multiprocessthreadpool.MultiprocessThread_Pool, Poolname, num_threads)
 
 
 def GetProcessPool(Poolname=None, num_threads=None):
-    '''Get or create a pool to invoke shell command processes'''
+    '''Get or create a specific pool to invoke shell command processes on the same computer using the subprocess module'''
     return __CreatePool(processpool.Process_Pool, Poolname, num_threads)
 
 
 def GetParallelPythonPool(Poolname=None, num_threads=None):
-    '''Get or create a pool to invoke shell command processes on a cluster using parallel python'''
+    '''Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel python'''
     return __CreatePool(parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
@@ -112,20 +116,32 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None):
     return pool
 
 
+
 def GetGlobalProcessPool():
+    '''
+    Common pool for processes on the local machine
+    '''
     return GetProcessPool("Global local process pool")
 
 
 def GetGlobalClusterPool():
+    '''
+    Get the common pool for placing tasks on the cluster
+    '''
     return GetParallelPythonPool("Global cluster pool")
 
 
 def GetGlobalThreadPool():
+    '''
+    Common pool for thread based tasks
+    '''
     return GetThreadPool("Global local thread pool")
 
 
 def GetGlobalMultithreadingPool():
-    '''Threads based on pythons multiprocess library which places each thread in a seperate process to avoid the GIL'''
+    '''
+    Common pool for multithreading module tasks, threads run in different python processes to work around the global interpreter lock
+    '''
     return GetMultithreadingPool("Global multithreading pool")
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
@@ -163,7 +179,7 @@ def __ConsoleWrite(s, newline=False):
     sys.stdout.write(s)
 
 
-def PrintProgressUpdate(s):
+def _PrintProgressUpdate(s):
     if  'ECLIPSE' in os.environ:
         __PrintProgressUpdateEclipse(s)
         return
@@ -171,7 +187,7 @@ def PrintProgressUpdate(s):
     __ConsoleWrite(s)
 
 
-def sprint(s):
+def _sprint(s):
     """ Thread-safe print fucntion """
     # Eclipse copies test output to the unit test window and this copy has
     # problems if the output has non-alphanumeric characters
@@ -181,7 +197,7 @@ def sprint(s):
         __ConsoleWrite(s, newline=True)
 
 
-def pprint(s):
+def _pprint(s):
     """ Thread-safe print fucntion, no newline """
 
     # Eclipse copies test output to the unit test window and this copy has
@@ -193,16 +209,17 @@ def pprint(s):
 
 
 def ClosePools():
+    '''
+    Shutdown all pools.
+    
+    '''
     global dictKnownPools
 
     for (key, pool) in dictKnownPools.items():
-        sprint("Waiting on pool: " + key)
-        pool.Shutdown()
+        _sprint("Waiting on pool: " + key)
+        pool.shutdown()
 
     dictKnownPools.clear()
 
-    # knownPoolKeys = dictKnownPools.keys()
-    # for key in knownPoolKeys:
-    #    del dictKnownPools[key]
 
 atexit.register(ClosePools)

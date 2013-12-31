@@ -15,6 +15,7 @@ import os
 import task
 
 import nornir_pools as pools
+import poolbase
 
 from threading import Lock
 
@@ -44,7 +45,7 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount)
     JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)))
-    pools.PrintProgressUpdate (JobQText)
+    pools._PrintProgressUpdate (JobQText)
 
 
 def _pickle_method(method):
@@ -92,7 +93,7 @@ class NonDaemonPool(multiprocessing.pool.Pool):
     Process = NoDaemonProcess
 
 
-class MultiprocessThreadTask():
+class MultiprocessThreadTask(task.Task):
 
     def __init__(self, name, asyncresult, logger, *args, **kwargs):
 
@@ -101,7 +102,6 @@ class MultiprocessThreadTask():
         self.kwargs = kwargs
         self.asyncresult = asyncresult
         self.logger = logger
-
 
     def wait_return(self):
 
@@ -131,7 +131,8 @@ class MultiprocessThreadTask():
     def iscompleted(self):
         return self.asyncresult.ready()
 
-class MultiprocessThread_Pool:
+
+class MultiprocessThread_Pool(poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
 
@@ -152,7 +153,7 @@ class MultiprocessThread_Pool:
         self._tasks = None
         # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
-    def Shutdown(self):
+    def shutdown(self):
         self.wait_completion()
 
 
