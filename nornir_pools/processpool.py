@@ -16,11 +16,12 @@ import logging
 import os
 
 import nornir_pools as pools
+import poolbase
 
 import task
 
 
-class ProcessTask(task.Task):
+class ProcessTask(task.TaskWithEvent):
 
     def __init__(self, name, func, *args, **kwargs):
         super(ProcessTask, self).__init__(name, *args, **kwargs)
@@ -66,7 +67,7 @@ class Worker(threading.Thread):
             except:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
-                    # sprint ("Queue Empty, exiting worker thread")
+                    # _sprint ("Queue Empty, exiting worker thread")
                     return
                 else:
                     continue
@@ -78,7 +79,7 @@ class Worker(threading.Thread):
 
             # print notification
 
-            # sprint("+++ {0}".format(entry.name))
+            # _sprint("+++ {0}".format(entry.name))
             self.logger.info("+++ {0}".format(entry.name))
 
             # do it!
@@ -133,17 +134,17 @@ class Worker(threading.Thread):
             out_string += time_str
             logging.info(out_string)
 
-#            sprint (out_string)
+#            _sprint (out_string)
             JobsQueued = self.tasks.qsize()
             if JobsQueued > 0:
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-                pools.PrintProgressUpdate (JobQText)
+                pools._PrintProgressUpdate (JobQText)
 
             self.tasks.task_done()
 
 
-class Process_Pool:
+class Process_Pool(poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
 
@@ -161,7 +162,7 @@ class Process_Pool:
             Worker(self.tasks, self.shutdown_event)
 
 
-    def Shutdown(self):
+    def shutdown(self):
         self.wait_completion()
         self.shutdown_event.set()
 
