@@ -94,8 +94,10 @@ class CTask(task.TaskWithEvent):
         # If we failed the call.  Check for an exception and raise if present
         if hasattr(self, 'exception'):
             raise self.exception
+        elif not hasattr(self, 'returncode'):
+            raise Exception("No return code from task and no exception detail provided")
         elif self.returncode < 0:
-            raise Exception("Negative return code from task but no exception detail provided")
+            raise Exception("Negative (Failure) return code from task with no exception detail provided")
 
     def wait_return(self):
         self.wait()
