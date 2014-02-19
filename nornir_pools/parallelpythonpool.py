@@ -142,7 +142,7 @@ def RemoteWorkerProcess(cmd, fargs):
         error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
-        sys.stderr.write(error_message)
+        # sys.stderr.write(error_message)
     finally:
         return entry
 
@@ -179,7 +179,7 @@ def RemoteFunction(func, fargs):
         error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
-        sys.stderr.write(error_message)
+        # sys.stderr.write(error_message)
     finally:
         return entry
 
