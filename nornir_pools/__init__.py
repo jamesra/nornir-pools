@@ -19,7 +19,7 @@ Pool creation functions share a common signature
 .. py:function:: Get<X>Pool([Poolname=None, num_threads=None)
    
    Return a pool of X type, listed below.  Repeated calls using the same name returns the same pool
-   
+    
    :param str Poolname: Name of the pool to get or create.  Passing "None" returns the global pool
    :param int num_threads: Number of tasks allowed to execute concurrently.  Not honored by all pools at this time
    
@@ -50,6 +50,7 @@ Pool Objects
 Task Objects
 ------------
 .. autoclass:: nornir_pools.task.Task
+   :members:
 
 Pool Destruction
 ----------------

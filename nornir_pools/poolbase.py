@@ -24,7 +24,7 @@ class PoolBase(object):
         Call a python function on the pool
 
         :param str name: Friendly name of the task. Non-unique
-        :param function func: Python function to invoke on the Pool
+        :param function func: Python function pointer to invoke on the pool
 
         :returns: task object
         :rtype: task

@@ -171,6 +171,9 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
 
         IncrementActiveJobCount()
         PrintJobsCount()
+        # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
+        # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
+        # This hangs the caller if they wait on the task.
         task = self.tasks.apply_async(func, args, kwargs, callback=callback)
         return MultiprocessThreadTask(name, task, self.logger, args, kwargs)
 
