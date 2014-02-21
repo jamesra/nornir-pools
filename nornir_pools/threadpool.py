@@ -71,7 +71,7 @@ class Worker(threading.Thread):
         self.tasks = tasks
         self.shutdown_event = shutdown_event
         self.daemon = True
-        self.logger = logging.getLogger('ThreadPool')
+        # self.logger = logging.getLogger('ThreadPool')
         self.start()
 
     def run(self):
@@ -95,7 +95,7 @@ class Worker(threading.Thread):
 
             # print notification
 
-            self.logger.info("+++ {0}".format(entry.name))
+            # self.logger.info("+++ {0}".format(entry.name))
             # _sprint("+++ {0}".format(entry.name))
             # _sprint("+")
 
@@ -119,7 +119,7 @@ class Worker(threading.Thread):
 
                 entry.exception = e
                 error_message = "\n*** {0}\n{1}\n".format(entry.name, traceback.format_exc())
-                self.logger.error(error_message)
+                # self.logger.error(error_message)
                 # sys.stderr.write(error_message)
                 pass
 
@@ -144,7 +144,7 @@ class Worker(threading.Thread):
             out_string += " " * (time_position - len(out_string))
             out_string += time_str
 
-            self.logger.info(out_string)
+            # self.logger.info(out_string)
 
             JobsQueued = self.tasks.qsize()
             if JobsQueued > 0:

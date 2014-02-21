@@ -11,6 +11,8 @@ import pp
 import subprocess
 from threading import Lock
 
+import socket
+
 import task
 
 import nornir_pools as pools
@@ -92,8 +94,10 @@ class CTask(task.TaskWithEvent):
         # If we failed the call.  Check for an exception and raise if present
         if hasattr(self, 'exception'):
             raise self.exception
+        elif not hasattr(self, 'returncode'):
+            raise Exception("No return code from task and no exception detail provided")
         elif self.returncode < 0:
-            raise Exception("Negative return code from task but no exception detail provided")
+            raise Exception("Negative (Failure) return code from task with no exception detail provided")
 
     def wait_return(self):
         self.wait()
@@ -133,10 +137,12 @@ def RemoteWorkerProcess(cmd, fargs):
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
         entry['exception'] = e
         entry['returncode'] = -1
+        entry['node'] = socket.gethostname()
 
-        error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
-        entry['error_message'] = error_message
-        sys.stderr.write(error_message)
+        error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
+        server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
+        entry['error_message'] = server_message + error_message
+        # sys.stderr.write(error_message)
     finally:
         return entry
 
@@ -165,13 +171,15 @@ def RemoteFunction(func, fargs):
         entry['returned_value'] = None
         entry['returncode'] = -1
         entry['exception'] = e
+        entry['node'] = socket.gethostname()
 
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
-        error_message = "\n*** {0}\n{1}\n".format(traceback.format_exc())
-        entry['error_message'] = error_message
-        sys.stderr.write(error_message)
+        error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
+        server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
+        entry['error_message'] = server_message + error_message
+        # sys.stderr.write(error_message)
     finally:
         return entry
 

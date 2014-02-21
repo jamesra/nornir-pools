@@ -3,14 +3,14 @@ import threading
 
 class Task(object):
     '''     
-    Represents a task assigned to a pool.  Responsible for allowing the caller to wait for task completion, raising any exceptions, and returning data from the call
-
-    :param str name: friendly name of the task. Does not need to be unique
-    :type name: str
-
+    Represents a task assigned to a pool.  Responsible for allowing the caller to wait for task completion, raising any exceptions, and returning data from the call.
+    Task objects are created by adding tasks or processes to the pools.  They are not intended to be created directly by callers.
     '''
 
     def __init__(self, name, *args, **kwargs):
+        '''
+        :param str name: friendly name of the task. Does not need to be unique
+        '''
         self.args = args
         self.kwargs = kwargs
         self.name = name  # name of the task, used for debugging
