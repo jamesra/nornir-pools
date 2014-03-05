@@ -79,12 +79,21 @@ class CTask(task.TaskWithEvent):
 
         PrintJobsCount()
 
+        self._callback_reached = True
+
         self.completed.set()
+
 
     def wait(self):
         self.server.wait(self.groupname)
 
-#        self.completed.wait()
+        # The job is done, so there is no reason for this to take more than ten seconds unless an error occurred and the callback will not be reached
+        self.completed.wait(10)
+
+        if not self._callback_reached:
+            raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote")
+            self.completed.set()
+
         super(CTask, self).wait()
 
         # PP is a bit strange in that the callback only occurs if the remote process does not raise an exception
@@ -95,7 +104,7 @@ class CTask(task.TaskWithEvent):
         if hasattr(self, 'exception'):
             raise self.exception
         elif not hasattr(self, 'returncode'):
-            raise Exception("No return code from task and no exception detail provided")
+            raise Exception("No return code from task, no exception detail provided, callback was reached")
         elif self.returncode < 0:
             raise Exception("Negative (Failure) return code from task with no exception detail provided")
 
@@ -104,13 +113,16 @@ class CTask(task.TaskWithEvent):
 
         if 'stdoutdata' in self.__dict__:
             return self.stdoutdata
+        elif 'returned_value' in self.__dict__:
+            return self.returned_value
         else:
             return None
 
 
 def RemoteWorkerProcess(cmd, fargs):
 
-    entry = {}
+    entry = {'type' : 'RemoteWorkerProcess'}
+
     try:
         args = fargs[0]
         kwargs = fargs[1]
@@ -149,7 +161,7 @@ def RemoteWorkerProcess(cmd, fargs):
 
 def RemoteFunction(func, fargs):
 
-    entry = {}
+    entry = {'type' : 'RemoteFunction'}
 
     try:
         args = fargs[0]
@@ -247,7 +259,8 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         IncrementActiveJobCount()
 
         taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
-        self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('traceback', 'subprocess', 'sys'))
+        ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('traceback', 'subprocess', 'sys'))
+        taskObj.ppTask = ppTask
 
         NextGroupName += 1
 
@@ -271,7 +284,8 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         kwargs['shell'] = True
 
         taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
-        self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('subprocess', 'sys'))
+        ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('traceback', 'subprocess', 'sys'))
+        taskObj.ppTask = ppTask
 
         NextGroupName += 1
 
