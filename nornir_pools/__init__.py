@@ -61,16 +61,16 @@ It is not necessary to perform any cleanup.  Functions to delete pools would not
 
 '''
 
-import nornir_pools.processpool as processpool
-import nornir_pools.threadpool as threadpool
-import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
-import nornir_pools.parallelpythonpool as parallelpythonpool
 import atexit
 import os
 import sys
 import datetime
-
 import logging
+
+import nornir_pools.processpool as processpool
+import nornir_pools.threadpool as threadpool
+import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
+import nornir_pools.parallelpythonpool as parallelpythonpool
 
 dictKnownPools = {}
 
