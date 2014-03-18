@@ -18,7 +18,7 @@ if __name__ == '__main__':
     tests_require = ["pp", "nose"]
 
     setup(name='nornir_pools',
-          version='1.1.1',
+          version='1.1.5',
           description="A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface",
           author="James Anderson",
           author_email="James.R.Anderson@utah.edu",

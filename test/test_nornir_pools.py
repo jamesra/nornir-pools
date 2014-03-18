@@ -36,21 +36,20 @@ def ReadFile(path, number):
 
     return int(numStr)
 
+def SleepForRandomTime(MaxTime=2.0):
+    sleepTime = random.random() * MaxTime
+    time.sleep(sleepTime)
+
 def CreateFileWithDelay(path, number):
         '''Create a file in the path whose name is [number].txt
            store the number in the file.'''
-        sleepTime = random.random() * 2  # Sleep up to two seconds
 
-        time.sleep(sleepTime)
-
+        SleepForRandomTime()
         return CreateFile(path, number)
 
 def ReadFileWithDelay(path, number):
 
-        sleepTime = random.random() * 2  # Sleep up to two seconds
-
-        time.sleep(sleepTime)
-
+        SleepForRandomTime()
         return ReadFile(path, number)
 
 def RaiseException(msg=None):
@@ -88,7 +87,38 @@ def VerifyExceptionBehaviour(test, pool):
     test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
 
 
-def runOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
+def SquareTheNumberWithDelay(num):
+    '''Squares the number on a thread'''
+    SleepForRandomTime()
+    return SquareTheNumber(num)
+
+def SquareTheNumber(num):
+    '''Squares the number on a thread'''
+    return num * num
+
+def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsInTest=100):
+
+    if Func is None:
+        Func = SquareTheNumber
+
+    if ExpectedResults is None:
+        ExpectedResults = {}
+        for i in range(0, numThreadsInTest):
+            ExpectedResults[i] = SquareTheNumber(i)
+
+    tasks = []
+    for i in range(0, numThreadsInTest):
+        task = TPool.add_task(str(i), Func, i)
+
+    for task in tasks:
+        retval = task.wait_return()
+        self.assertEqual(ExpectedResults[task.Name], retval, "Returned value from function differs from expected value")
+
+    return
+
+
+
+def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
 
     if CreateFunc is None:
         CreateFunc = CreateFile
@@ -192,11 +222,12 @@ class TestThreadPool(TestThreadPoolBase):
 
         VerifyExceptionBehaviour(self, TPool)
 
-        runOnPool(self, TPool)
+        runFunctionOnPool(self, TPool)
+        runFileIOOnPool(self, TPool)
 
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
-        runOnPool(self, TPool)
+        runFileIOOnPool(self, TPool)
 
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
@@ -215,11 +246,12 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
 
         VerifyExceptionBehaviour(self, TPool)
 
-        runOnPool(self, TPool)
+        runFunctionOnPool(self, TPool)
+        runFileIOOnPool(self, TPool)
 
         TPool = pools.GetMultithreadingPool("Test multithreading pool")
         self.assertIsNotNone(TPool)
-        runOnPool(self, TPool)
+        runFileIOOnPool(self, TPool)
 
 
 class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
@@ -230,7 +262,8 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
         TPool = pools.GetGlobalMultithreadingPool()
         self.assertIsNotNone(TPool)
 
-        runOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
+        runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
 
 
 class TestThreadPoolWithRandomDelay(TestThreadPool):
@@ -241,7 +274,8 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
         TPool = pools.GetGlobalThreadPool()
         self.assertIsNotNone(TPool)
 
-        runOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
+        runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
 
 class TestProcessPool(unittest.TestCase):
 
@@ -279,7 +313,9 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
 
         VerifyExceptionBehaviour(self, PPool)
 
-        runOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runFunctionOnPool(self, PPool)
+        runFunctionOnPool(self, PPool, Func=SquareTheNumberWithDelay)
+        runFileIOOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
 
         VerifyExceptionBehaviour(self, PPool)
 
