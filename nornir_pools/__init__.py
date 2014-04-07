@@ -178,6 +178,14 @@ def __ConsoleWrite(s, newline=False):
         s = s + '\n'
 
     sys.stdout.write(s)
+    
+    
+def _PrintWarning(s):
+    if  'ECLIPSE' in os.environ:
+        __PrintProgressUpdateEclipse(s)
+        return
+
+    __ConsoleWrite(s, newline=True)
 
 
 def _PrintProgressUpdate(s):
