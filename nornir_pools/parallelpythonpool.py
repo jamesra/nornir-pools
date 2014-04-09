@@ -87,8 +87,8 @@ class CTask(task.TaskWithEvent):
     def wait(self):
         self.server.wait(self.groupname)
 
-        # The job is done, so there is no reason for this to take more than ten seconds unless an error occurred and the callback will not be reached
-        self.completed.wait(30)
+        # The job is done, so there is no reason for this to take more than five minutes unless an error occurred and the callback will not be reached
+        self.completed.wait(300)
 
         if not self._callback_reached:
             pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
