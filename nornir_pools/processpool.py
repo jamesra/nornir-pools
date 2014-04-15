@@ -6,7 +6,7 @@
 
 import math
 import multiprocessing
-import Queue as queue
+from six.moves import queue
 import sys
 import threading
 import time
@@ -16,9 +16,9 @@ import logging
 import os
 
 import nornir_pools as pools
-import poolbase
+from . import poolbase
 
-import task
+from . import task
 
 
 class ProcessTask(task.TaskWithEvent):

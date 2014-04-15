@@ -224,7 +224,7 @@ def ClosePools():
     '''
     global dictKnownPools
 
-    for (key, pool) in dictKnownPools.items():
+    for (key, pool) in list(dictKnownPools.items()):
         _sprint("Waiting on pool: " + key)
         pool.shutdown()
 

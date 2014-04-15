@@ -70,7 +70,7 @@ def VerifyExceptionBehaviour(test, pool):
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait_return()
     except IntentionalPoolException as e:
-        print "Correctly found exception in thread\n" + str(e)
+        print("Correctly found exception in thread\n" + str(e))
         ExceptionFound = True
         pass
 
@@ -80,7 +80,7 @@ def VerifyExceptionBehaviour(test, pool):
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait()
     except IntentionalPoolException as e:
-        print "Correctly found exception in thread\n" + str(e)
+        print("Correctly found exception in thread\n" + str(e))
         ExceptionFound = True
         pass
 
@@ -331,8 +331,8 @@ class TestClusterPool(unittest.TestCase):
         numTasksInTest = 100
 
         nodes = PPool.get_active_nodes()
-        print "Active Nodes"
-        print str(nodes)
+        print("Active Nodes")
+        print(str(nodes))
 
         tasks = []
         for i in range(1, numTasksInTest):

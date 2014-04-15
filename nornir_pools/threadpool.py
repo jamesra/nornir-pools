@@ -6,16 +6,16 @@
 
 import math
 import multiprocessing
-import Queue as queue
+from six.moves import queue
 import sys
 import threading
 import time
 import traceback
 import logging
-import task
+from . import task
 
 import nornir_pools as pools
-import poolbase
+from . import poolbase
 
 
 class ThreadTask(task.TaskWithEvent):
@@ -112,7 +112,7 @@ class Worker(threading.Thread):
                 else:
                     entry.returned_value = entry.func()
 
-            except Exception, e:
+            except Exception as e:
 
                 # inform operator of the name of the task throwing the exception
                 # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads

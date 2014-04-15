@@ -13,10 +13,10 @@ from threading import Lock
 
 import socket
 
-import task
+from . import task
 
 import nornir_pools as pools
-import poolbase
+from . import poolbase
 
 NextGroupName = 0
 

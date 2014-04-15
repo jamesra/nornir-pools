@@ -13,12 +13,12 @@ if __name__ == '__main__':
 
     use_setuptools()
 
-    install_requires = ["pp"]
+    install_requires = ["pp", "six"]
 
     tests_require = ["pp", "nose"]
 
     setup(name='nornir_pools',
-          version='1.1.7',
+          version='1.1.8',
           description="A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface",
           author="James Anderson",
           author_email="James.R.Anderson@utah.edu",
