@@ -179,8 +179,8 @@ class PoolTestBase(unittest.TestCase):
         '''Create a thread pool that creates 100 files with a number in them'''
 
         TestBaseDir = os.getcwd()
-        if 'TESTDIR' in os.environ:
-            TestBaseDir = os.environ["TESTDIR"]
+        if 'TESTOUTPUTPATH' in os.environ:
+            TestBaseDir = os.environ["TESTOUTPUTPATH"]
 
         self.TestOutputPath = os.path.join(TestBaseDir, self.classname)
 

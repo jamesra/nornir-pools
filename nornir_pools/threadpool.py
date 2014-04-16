@@ -12,10 +12,11 @@ import threading
 import time
 import traceback
 import logging
-from . import task
+
+import nornir_pools.task as task
 
 import nornir_pools as pools
-from . import poolbase
+import nornir_pools.poolbase as poolbase
 
 
 class ThreadTask(task.TaskWithEvent):

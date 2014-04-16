@@ -12,10 +12,10 @@ import threading
 import traceback
 import logging
 import os
-from . import task
+import nornir_pools.task as task
 
 import nornir_pools as pools
-from . import poolbase
+import nornir_pools.poolbase as poolbase
 
 from threading import Lock
 

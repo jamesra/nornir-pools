@@ -67,10 +67,16 @@ import sys
 import datetime
 import logging
 
-import nornir_pools.processpool as processpool
-import nornir_pools.threadpool as threadpool
-import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
-import nornir_pools.parallelpythonpool as parallelpythonpool
+import nornir_pools.processpool
+import nornir_pools.threadpool
+import nornir_pools.multiprocessthreadpool
+
+__ParallelPythonAvailable = True
+try:
+    import nornir_pools.parallelpythonpool
+except ImportError as e:
+    __ParallelPythonAvailable = False
+    pass
 
 dictKnownPools = {}
 
@@ -129,6 +135,9 @@ def GetGlobalClusterPool():
     '''
     Get the common pool for placing tasks on the cluster
     '''
+    if not __ParallelPythonAvailable:
+        raise Exception("Parallel python is not available")
+
     return GetParallelPythonPool("Global cluster pool")
 
 
@@ -178,8 +187,8 @@ def __ConsoleWrite(s, newline=False):
         s = s + '\n'
 
     sys.stdout.write(s)
-    
-    
+
+
 def _PrintWarning(s):
     if  'ECLIPSE' in os.environ:
         __PrintProgressUpdateEclipse(s)
