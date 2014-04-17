@@ -6,6 +6,8 @@
 
 import multiprocessing
 import multiprocessing.pool
+import subprocess
+import socket
 import threading
 # import copy_reg
 # import types
@@ -164,7 +166,6 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
 #             self.tasks.join()
 #             self._tasks = None
 
-
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
@@ -176,7 +177,6 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
         # This hangs the caller if they wait on the task.
         task = self.tasks.apply_async(func, args, kwargs, callback=callback)
         return MultiprocessThreadTask(name, task, self.logger, args, kwargs)
-
 
     def wait_completion(self):
 

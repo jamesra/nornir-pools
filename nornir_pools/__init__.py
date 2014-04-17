@@ -66,12 +66,15 @@ import os
 import sys
 import datetime
 import logging
+import warnings
 
 import nornir_pools.processpool
 import nornir_pools.threadpool
 import nornir_pools.multiprocessthreadpool
+import nornir_pools.local_machine_pool
 
 __ParallelPythonAvailable = True
+
 try:
     import nornir_pools.parallelpythonpool
 except ImportError as e:
@@ -85,22 +88,29 @@ def GetThreadPool(Poolname=None, num_threads=None):
     '''
     Get or create a specific thread pool using vanilla python threads    
     '''
-    return __CreatePool(threadpool.Thread_Pool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.threadpool.Thread_Pool, Poolname, num_threads)
+
+
+def GetLocalMachinePool(Poolname=None, num_threads=None):
+
+    return __CreatePool(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads)
 
 
 def GetMultithreadingPool(Poolname=None, num_threads=None):
     '''Get or create a specific thread pool to execute threads in other processes on the same computer using the multiprocessing library'''
-    return __CreatePool(multiprocessthreadpool.MultiprocessThread_Pool, Poolname, num_threads)
+    warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
+    return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThread_Pool , Poolname, num_threads)
 
 
 def GetProcessPool(Poolname=None, num_threads=None):
     '''Get or create a specific pool to invoke shell command processes on the same computer using the subprocess module'''
-    return __CreatePool(processpool.Process_Pool, Poolname, num_threads)
+    warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
+    return __CreatePool(nornir_pools.processpool.Process_Pool, Poolname, num_threads)
 
 
 def GetParallelPythonPool(Poolname=None, num_threads=None):
     '''Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel python'''
-    return __CreatePool(parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
 def __CreatePool(poolclass, Poolname=None, num_threads=None):
@@ -108,7 +118,7 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None):
     global dictKnownPools
 
     if Poolname is None:
-        return GetGlobalMultithreadingPool()
+        return GetGlobalLocalMachinePool()
 
     if Poolname in dictKnownPools:
         pool = dictKnownPools[Poolname]
@@ -128,15 +138,23 @@ def GetGlobalProcessPool():
     '''
     Common pool for processes on the local machine
     '''
-    return GetProcessPool("Global local process pool")
+    return GetGlobalLocalMachinePool()
+    # return GetProcessPool("Global local process pool")
 
+def GetGlobalLocalMachinePool():
+    '''
+    Common pool for launching other processes for threads or executables.  Combines multithreading and process pool interface.
+    '''
+
+    return GetLocalMachinePool("Global local machine pool")
 
 def GetGlobalClusterPool():
     '''
     Get the common pool for placing tasks on the cluster
     '''
     if not __ParallelPythonAvailable:
-        raise Exception("Parallel python is not available")
+        return GetGlobalLocalMachinePool()
+        # raise Exception("Parallel python is not available")
 
     return GetParallelPythonPool("Global cluster pool")
 
@@ -152,7 +170,8 @@ def GetGlobalMultithreadingPool():
     '''
     Common pool for multithreading module tasks, threads run in different python processes to work around the global interpreter lock
     '''
-    return GetMultithreadingPool("Global multithreading pool")
+    return GetGlobalLocalMachinePool()
+    # return GetMultithreadingPool("Global multithreading pool")
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
 __LastConsoleWrite = datetime.datetime.utcnow()
