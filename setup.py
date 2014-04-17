@@ -4,18 +4,21 @@ Created on Aug 30, 2013
 @author: u0490822
 '''
 
-
 from ez_setup import use_setuptools
-from setuptools import setup, find_packages
+
+
 
 
 if __name__ == '__main__':
-
     use_setuptools()
 
-    install_requires = ["pp", "six"]
+    from setuptools import setup
 
-    tests_require = ["pp", "nose"]
+    install_requires = ["six"]
+
+    extras_require = {"pp" : ["pp"]}
+
+    tests_require = ["nose"]
 
     setup(name='nornir_pools',
           version='1.1.8',
@@ -25,4 +28,5 @@ if __name__ == '__main__':
           url="https://github.com/nornir/nornir-pools",
           install_requires=install_requires,
           tests_require=tests_require,
+          extras_require=extras_require,
           packages=["nornir_pools"], test_suite='test')
