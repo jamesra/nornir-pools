@@ -20,7 +20,11 @@ if __name__ == '__main__':
 
     tests_require = ["nose"]
 
+    classifiers = ['Programming Language :: Python :: 3.4',
+                   'Programming Language :: Python :: 2.7']
+
     setup(name='nornir_pools',
+          classifiers=classifiers,
           version='1.1.8',
           description="A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface",
           author="James Anderson",
