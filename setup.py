@@ -16,7 +16,8 @@ if __name__ == '__main__':
 
     install_requires = ["six"]
 
-    extras_require = {"pp" : ["pp"]}
+    # extras_require = {"pp" : ["pp"]}
+    extras_require = {}
 
     tests_require = ["nose"]
 

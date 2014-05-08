@@ -73,7 +73,7 @@ import nornir_pools.threadpool
 import nornir_pools.multiprocessthreadpool
 import nornir_pools.local_machine_pool
 
-__ParallelPythonAvailable = True
+__ParallelPythonAvailable = False
 
 try:
     import nornir_pools.parallelpythonpool
