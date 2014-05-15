@@ -6,16 +6,18 @@
 
 import multiprocessing
 import multiprocessing.pool
+import subprocess
+import socket
 import threading
 # import copy_reg
 # import types
 import traceback
 import logging
 import os
-import task
+import nornir_pools.task as task
 
 import nornir_pools as pools
-import poolbase
+import nornir_pools.poolbase as poolbase
 
 from threading import Lock
 
@@ -49,9 +51,9 @@ def PrintJobsCount():
 
 
 def _pickle_method(method):
-    func_name = method.im_func.__name__
-    obj = method.im_self
-    cls = method.im_class
+    func_name = method.__func__.__name__
+    obj = method.__self__
+    cls = method.__self__.__class__
     if func_name.startswith('__') and not func_name.endswith('__'):  # deal with mangled names
         cls_name = cls.__name__.lstrip('_')
         func_name = '_' + cls_name + func_name
@@ -164,7 +166,6 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
 #             self.tasks.join()
 #             self._tasks = None
 
-
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
@@ -176,7 +177,6 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
         # This hangs the caller if they wait on the task.
         task = self.tasks.apply_async(func, args, kwargs, callback=callback)
         return MultiprocessThreadTask(name, task, self.logger, args, kwargs)
-
 
     def wait_completion(self):
 

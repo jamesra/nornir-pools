@@ -7,16 +7,16 @@
 import sys
 import time
 import traceback
-import pp
 import subprocess
 from threading import Lock
-
 import socket
 
-import task
+import pp
+
+from . import task
 
 import nornir_pools as pools
-import poolbase
+from . import poolbase
 
 NextGroupName = 0
 
@@ -94,7 +94,7 @@ class CTask(task.TaskWithEvent):
             pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             pools._PrintWarning("We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
             self.completed.wait()
-            #raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
+            # raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             self.completed.set()
 
         super(CTask, self).wait()
