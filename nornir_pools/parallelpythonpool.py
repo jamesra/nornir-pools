@@ -7,16 +7,16 @@
 import sys
 import time
 import traceback
-import pp
 import subprocess
 from threading import Lock
-
 import socket
 
-import task
+import pp
+
+from . import task
 
 import nornir_pools as pools
-import poolbase
+from . import poolbase
 
 NextGroupName = 0
 
@@ -87,11 +87,14 @@ class CTask(task.TaskWithEvent):
     def wait(self):
         self.server.wait(self.groupname)
 
-        # The job is done, so there is no reason for this to take more than ten seconds unless an error occurred and the callback will not be reached
-        self.completed.wait(120)
+        # The job is done, so there is no reason for this to take more than five minutes unless an error occurred and the callback will not be reached
+        self.completed.wait(300)
 
         if not self._callback_reached:
-            raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
+            pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
+            pools._PrintWarning("We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
+            self.completed.wait()
+            # raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             self.completed.set()
 
         super(CTask, self).wait()
