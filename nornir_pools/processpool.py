@@ -52,7 +52,7 @@ class Worker(threading.Thread):
         self.tasks = tasks
         self.shutdown_event = shutdown_event
         self.daemon = True
-        self.logger = logging.getLogger('ProcessPool')
+        self.logger = logging.getLogger(__name__)
         self.start()
 
 
@@ -78,9 +78,10 @@ class Worker(threading.Thread):
             task_start_time = time.time()
 
             # print notification
+            logger = logging.getLogger(__name__ + '.Worker')
 
             # _sprint("+++ {0}".format(entry.name))
-            self.logger.info("+++ {0}".format(entry.name))
+            logger.info("+++ {0}".format(entry.name))
 
             # do it!
 
@@ -99,7 +100,7 @@ class Worker(threading.Thread):
                 # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
                 error_message = "\n*** {0}\n{1}\n{2}\n".format(entry.name, entry.args, traceback.format_exc())
-                self.logger.error(error_message)
+                logger.error(error_message)
                 sys.stderr.write(error_message)
 
                 entry.exception = e

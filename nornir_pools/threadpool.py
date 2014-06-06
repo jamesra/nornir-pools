@@ -72,7 +72,7 @@ class Worker(threading.Thread):
         self.tasks = tasks
         self.shutdown_event = shutdown_event
         self.daemon = True
-        # self.logger = logging.getLogger('ThreadPool')
+        # self.logger = logging.getLogger(__name__)
         self.start()
 
     def run(self):
@@ -168,7 +168,7 @@ class Thread_Pool(poolbase.PoolBase):
 
         self.num_threads = num_threads
         self.shutdown_event = threading.Event()
-        self.logger = logging.getLogger('ThreadPool')
+        self.logger = logging.getLogger(__name__)
         self.keep_alive_thread = None
         self.tasks = queue.Queue()
         self.logger.warn("Creating Thread Pool")
