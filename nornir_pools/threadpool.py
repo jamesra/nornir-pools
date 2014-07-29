@@ -175,7 +175,9 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
         super(Thread_Pool, self).__init__(num_threads=num_threads,  WorkerCheckInterval=WorkerCheckInterval)
-      
+
+        self._next_thread_id = 0
+
         self.logger.warn("Creating Thread Pool") 
         return
 
@@ -183,7 +185,10 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
         self.tasks.join()
         
     def add_worker_thread(self):
-        return Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        w.name = "Thread pool #%d" % (self._next_thread_id)
+        self._next_thread_id += 1
+        return w
 
     def add_task(self, name, func, *args, **kwargs):
 

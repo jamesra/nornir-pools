@@ -149,7 +149,8 @@ class Worker(threading.Thread):
 
 class Process_Pool(poolbase.LocalThreadPoolBase):
 
-    """Pool of threads consuming tasks from a queue""" 
+    """Pool of threads consuming tasks from a queue"""
+    
 
     def __init__(self, num_threads=None, WorkerCheckInterval = 0.5):
         '''
@@ -158,14 +159,18 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         '''
         super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
         
-            
+        self._next_thread_id = 0
         self.logger.warn("Creating Process Pool") 
         #for _ in range(int(num_threads)):
             #Worker(self.tasks, self.shutdown_event)
 
         
     def add_worker_thread(self):
-        return Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+         
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        w.name = "Process pool #%d" % (self._next_thread_id)
+        self._next_thread_id += 1
+        return w
 
 #     def __del__(self):
 #         self.wait_completion()
