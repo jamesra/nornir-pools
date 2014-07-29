@@ -43,44 +43,47 @@ class ProcessTask(task.TaskWithEvent):
 class Worker(threading.Thread):
 
     """Thread executing tasks from a given tasks queue"""
-
-    WaitTime = 0.5
-
-    def __init__(self, tasks, shutdown_event, **kwargs):
+ 
+    def __init__(self, tasks, deadthreadqueue, shutdown_event, queue_wait_time, **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
+        self.deadthreadqueue = deadthreadqueue
         self.shutdown_event = shutdown_event
         self.daemon = True
-        self.logger = logging.getLogger('ProcessPool')
-        self.start()
+        self.queue_wait_time = queue_wait_time
+        #self.logger = logging.getLogger(__name__)
+        self.start() 
 
+    
 
     def run(self):
-
+        # print notification
+        #logger = logging.getLogger(__name__ + '.Worker')
+        
         while True:
 
             # Get next task from the queue (blocks thread if queue is empty until entry arrives)
 
             try:
-                entry = self.tasks.get(True, Worker.WaitTime)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
+                entry = self.tasks.get(True, self.queue_wait_time)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
             except:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
                     # _sprint ("Queue Empty, exiting worker thread")
+                    self.deadthreadqueue.put(self)
                     return
                 else:
-                    continue
-
-
+                    #logger.info("Thread #%d idle shutdown" % (self.ident))   
+                    self.deadthreadqueue.put(self)                     
+                    return
+                    
             # Record start time so we get a sense of performance
 
-            task_start_time = time.time()
-
-            # print notification
+            task_start_time = time.time() 
 
             # _sprint("+++ {0}".format(entry.name))
-            self.logger.info("+++ {0}".format(entry.name))
+            #logger.info("+++ {0}".format(entry.name))
 
             # do it!
 
@@ -99,7 +102,7 @@ class Worker(threading.Thread):
                 # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
                 error_message = "\n*** {0}\n{1}\n{2}\n".format(entry.name, entry.args, traceback.format_exc())
-                self.logger.error(error_message)
+                logger.error(error_message)
                 sys.stderr.write(error_message)
 
                 entry.exception = e
@@ -144,30 +147,30 @@ class Worker(threading.Thread):
             self.tasks.task_done()
 
 
-class Process_Pool(poolbase.PoolBase):
+class Process_Pool(poolbase.LocalThreadPoolBase):
 
     """Pool of threads consuming tasks from a queue"""
+    
 
-    def __init__(self, num_threads=None):
+    def __init__(self, num_threads=None, WorkerCheckInterval = 0.5):
+        '''
+        :param int num_threads: Maximum number of threads in the pool
+        :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
+        '''
+        super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
+        
+        self._next_thread_id = 0
+        self.logger.warn("Creating Process Pool") 
+        #for _ in range(int(num_threads)):
+            #Worker(self.tasks, self.shutdown_event)
 
-        if (num_threads is None):
-            num_threads = multiprocessing.cpu_count()
-
-        self.shutdown_event = threading.Event()
-        self.shutdown_event.clear()
-        self.tasks = queue.Queue()
-        self.keep_alive_thread = None
-
-        for _ in range(int(num_threads)):
-            Worker(self.tasks, self.shutdown_event)
-
-
-    def shutdown(self):
-        self.wait_completion()
-        self.shutdown_event.set()
-
-        # Give threads time to die gracefully
-        time.sleep(Worker.WaitTime + 1)
+        
+    def add_worker_thread(self):
+         
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        w.name = "Process pool #%d" % (self._next_thread_id)
+        self._next_thread_id += 1
+        return w
 
 #     def __del__(self):
 #         self.wait_completion()
@@ -176,8 +179,6 @@ class Process_Pool(poolbase.PoolBase):
 #
 #         # time.sleep(Worker.WaitTime + 1)
 
-    def __keep_alive_thread_func(self):
-        self.tasks.join()
 
     def add_process(self, name, func, *args, **kwargs):
         """Add a task to the queue, args are passed directly to subprocess.Popen"""
@@ -185,13 +186,7 @@ class Process_Pool(poolbase.PoolBase):
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
-
-        start_keep_alive_thread = False
-        if self.keep_alive_thread is None:
-            start_keep_alive_thread = True
-        elif self.keep_alive_thread.is_alive() == False:
-            start_keep_alive_thread = True
-
+ 
         if isinstance(kwargs, dict):
             if not 'shell' in kwargs:
                 kwargs['shell'] = True
@@ -201,16 +196,7 @@ class Process_Pool(poolbase.PoolBase):
 
         entry = ProcessTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
-
-        if start_keep_alive_thread:
-            self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
-            self.keep_alive_thread.start()
+        self.add_threads_if_needed()
 
         return entry
-
-
-    def wait_completion(self):
-
-        """Wait for completion of all the tasks in the queue"""
-
-        self.tasks.join()
+ 

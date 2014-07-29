@@ -65,7 +65,6 @@ import atexit
 import os
 import sys
 import datetime
-import logging
 import warnings
 
 import nornir_pools.processpool
