@@ -63,17 +63,19 @@ class ThreadTask(task.TaskWithEvent):
 class Worker(threading.Thread):
 
     """Thread executing tasks from a given tasks queue"""
+ 
 
-    WaitTime = 0.5
-
-    def __init__(self, tasks, shutdown_event, **kwargs):
+    def __init__(self, tasks, shutdown_event, queue_wait_time, **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
         self.shutdown_event = shutdown_event
         self.daemon = True
+        
+        self.queue_wait_time = queue_wait_time
         # self.logger = logging.getLogger(__name__)
         self.start()
+        
 
     def run(self):
 
@@ -81,14 +83,16 @@ class Worker(threading.Thread):
 
             # Get next task from the queue (blocks thread if queue is empty until entry arrives)
             try:
-                entry = self.tasks.get(True, Worker.WaitTime)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
+                entry = self.tasks.get(True, self.queue_wait_time)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
             except:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
                     # _sprint ("Queue Empty, exiting worker thread")
                     return
-                else:
-                    continue
+                else: 
+                    #logger.info("Thread #%d idle shutdown" % (self.ident))
+                    return 
+                    
 
             # Record start time so we get a sense of performance
 
@@ -157,44 +161,26 @@ class Worker(threading.Thread):
             self.tasks.task_done()
 
 
-class Thread_Pool(poolbase.PoolBase):
+class Thread_Pool(poolbase.LocalThreadPoolBase):
 
     """Pool of threads consuming tasks from a queue"""
+    #How often workers check for new jobs in the queue
 
-    def __init__(self, num_threads=None):
-
-        if (num_threads is None):
-            num_threads = multiprocessing.cpu_count()
-
-        self.num_threads = num_threads
-        self.shutdown_event = threading.Event()
-        self.logger = logging.getLogger(__name__)
-        self.keep_alive_thread = None
-        self.tasks = queue.Queue()
-        self.logger.warn("Creating Thread Pool")
-        self.Threads = []
+    def __init__(self, num_threads=None,  WorkerCheckInterval = 0.5):
+        '''
+        :param int num_threads: Maximum number of threads in the pool
+        :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
+        '''
+        super(Thread_Pool, self).__init__(num_threads=num_threads,  WorkerCheckInterval=WorkerCheckInterval)
+      
+        self.logger.warn("Creating Thread Pool") 
         return
-
-    def shutdown(self):
-        self.wait_completion()
-        self.shutdown_event.set()
-        self.Threads = []
-
-        # Give threads time to die gracefully
-        time.sleep(Worker.WaitTime + 1)
-#
-#     def __del__(self):
-#       self.wait_completion()
-#         # Close all of our threads
-#         self.shutdown_event.set()
-#
-#         self.Threads = []
-#
-#         time.sleep(Worker.WaitTime + 1)
 
     def __keep_alive_thread_func(self):
         self.tasks.join()
-
+        
+    def add_worker_thread(self):
+        return Worker(self.tasks, self.shutdown_event, self.WorkerCheckInterval)
 
     def add_task(self, name, func, *args, **kwargs):
 
@@ -203,30 +189,11 @@ class Thread_Pool(poolbase.PoolBase):
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
-
-        start_keep_alive_thread = False
-        if self.keep_alive_thread is None:
-            start_keep_alive_thread = True
-        elif self.keep_alive_thread.is_alive() == False:
-            start_keep_alive_thread = True
+ 
 
         entry = ThreadTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
-
-        # We start threadpool with no threads, and add threads as the queue grows.
-        if len(self.Threads) < self.num_threads:
-            JobsQueued = self.tasks.qsize()
-            if JobsQueued > len(self.Threads):
-                self.Threads.append(Worker(self.tasks, self.shutdown_event))
-
-        if start_keep_alive_thread:
-            self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
-            self.keep_alive_thread.start()
-
+        self.add_threads_if_needed() 
+        
         return entry
 
-
-    def wait_completion(self):
-        """Wait for completion of all the tasks in the queue"""
-
-        self.tasks.join()

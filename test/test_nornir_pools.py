@@ -165,7 +165,9 @@ def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTes
 
         self.assertFalse(os.path.exists(filenamefullpath), "file undeleted after task reported complete")
 
-    self.assertEqual(0, len(os.listdir(self.TestOutputPath)))
+    time.sleep(0.5) #For some reason this test fails without a short delay
+    num_files = len(os.listdir(self.TestOutputPath))
+    self.assertEqual(0, num_files, "Found %d files in dir %s" % (num_files, self.TestOutputPath))
 
 
 class PoolTestBase(unittest.TestCase):
