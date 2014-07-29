@@ -62,6 +62,7 @@ class LocalThreadPoolBase(PoolBase):
         super(LocalThreadPoolBase, self).__init__(*args, **kwargs)
         
         self.tasks = queue.Queue()
+        self.deadthreadqueue = queue.Queue() #Threads put themselves here when they die
         self.shutdown_event = threading.Event()
         self.shutdown_event.clear()
         self.keep_alive_thread = None
@@ -116,19 +117,24 @@ class LocalThreadPoolBase(PoolBase):
             else:
                 break
         
-        if num_threads_created > 0:
-            self.logger.warn("Created %d threads for pool" % (num_threads_created))
+        #if num_threads_created > 0:
+            #self.logger.warn("Created %d threads for pool" % (num_threads_created))
         
         if not self.__has_keep_alive_thread():
             self.__start_keep_alive_thread()
                 
     
     def remove_finished_threads(self):
-        for i in range(len(self._threads)-1, 0,-1):
-            t = self._threads[i]
-            if not t.is_alive():
-                self.logger.warn("Thread %d idle shutdown" % (t.ident))
-                del self._threads[i]
+        while not self.deadthreadqueue.empty():
+            t = self.deadthreadqueue.get_nowait()
+            if t is None:
+                break
+            else:  
+                for i in range(len(self._threads)-1, 0,-1):
+                    if t == self._threads[i]:
+                        del self._threads[i]
+                        
+        return
                  
 
     def wait_completion(self):

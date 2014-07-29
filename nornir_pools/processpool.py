@@ -44,10 +44,11 @@ class Worker(threading.Thread):
 
     """Thread executing tasks from a given tasks queue"""
  
-    def __init__(self, tasks, shutdown_event, queue_wait_time, **kwargs):
+    def __init__(self, tasks, deadthreadqueue, shutdown_event, queue_wait_time, **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
+        self.deadthreadqueue = deadthreadqueue
         self.shutdown_event = shutdown_event
         self.daemon = True
         self.queue_wait_time = queue_wait_time
@@ -70,10 +71,12 @@ class Worker(threading.Thread):
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
                     # _sprint ("Queue Empty, exiting worker thread")
+                    self.deadthreadqueue.put(self)
                     return
                 else:
-                    #logger.info("Thread #%d idle shutdown" % (self.ident))                        
-                    return 
+                    #logger.info("Thread #%d idle shutdown" % (self.ident))   
+                    self.deadthreadqueue.put(self)                     
+                    return
                     
             # Record start time so we get a sense of performance
 
@@ -162,7 +165,7 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
 
         
     def add_worker_thread(self):
-        return Worker(self.tasks, self.shutdown_event, self.WorkerCheckInterval)
+        return Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
 
 #     def __del__(self):
 #         self.wait_completion()
