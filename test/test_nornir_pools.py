@@ -182,7 +182,7 @@ class PoolTestBase(unittest.TestCase):
         if 'TESTOUTPUTPATH' in os.environ:
             TestBaseDir = os.environ["TESTOUTPUTPATH"]
 
-        self.TestOutputPath = os.path.join(TestBaseDir, self.classname)
+        self.TestOutputPath = os.path.join(TestBaseDir, self.classname, self.id())
 
         if os.path.exists(self.TestOutputPath):
             shutil.rmtree(self.TestOutputPath)
