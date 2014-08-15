@@ -147,7 +147,7 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
 
     def __init__(self, num_threads=None):
         self.shutdown_event = threading.Event()
-        self.logger = logging.getLogger('Multithreading Pool')
+        self.logger = logging.getLogger(__name__)
         self.logger.warn("Creating Multithreading Pool")
 
         # self.manager =  multiprocessing.Manager()
