@@ -126,13 +126,16 @@ class LocalThreadPoolBase(PoolBase):
     
     def remove_finished_threads(self):
         while not self.deadthreadqueue.empty():
-            t = self.deadthreadqueue.get_nowait()
-            if t is None:
-                break
-            else:  
-                for i in range(len(self._threads)-1, 0,-1):
-                    if t == self._threads[i]:
-                        del self._threads[i]
+            try:
+                t = self.deadthreadqueue.get_nowait()
+                if t is None:
+                    break
+                else:  
+                    for i in range(len(self._threads)-1, 0,-1):
+                        if t == self._threads[i]:
+                            del self._threads[i]
+            except queue.Empty as e:
+                return 
                         
         return
                  
