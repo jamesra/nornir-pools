@@ -25,6 +25,7 @@ if __name__ == '__main__':
                    'Programming Language :: Python :: 2.7']
 
     setup(name='nornir_pools',
+          zip_safe=True,
           classifiers=classifiers,
           version='1.2.2',
           description="A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface",
