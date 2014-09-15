@@ -178,7 +178,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
 
         self._next_thread_id = 0
 
-        self.logger.warn("Creating Thread Pool") 
+        self.logger.info("Creating Thread Pool") 
         return
 
     def __keep_alive_thread_func(self):
