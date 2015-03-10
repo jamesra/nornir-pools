@@ -14,18 +14,16 @@ import threading
 import traceback
 import logging
 import os
-import nornir_pools.task as task
+import nornir_pools.task
 
-import nornir_pools as pools
-import nornir_pools.poolbase as poolbase
+import nornir_pools as pools 
 
-from threading import Lock
+from threading import Lock 
 
 # import pools
 
 JobCountLock = Lock()
 ActiveJobCount = 0
-
 
 def IncrementActiveJobCount():
     global JobCountLock
@@ -89,19 +87,34 @@ class NoDaemonProcess(multiprocessing.Process):
         pass
 
     daemon = property(_get_daemon, _set_daemon)
-
+     
+#     def run(self):
+#         '''
+#         Method to be run in sub-process; can be overridden in sub-class
+#         '''
+#         pools.start_profiling()
+#         retval = super(NoDaemonProcess, self).run() 
+#         return retval
+# #         
+#     def terminate(self):
+# #         '''
+# #         Terminate process; sends SIGTERM signal or uses TerminateProcess()
+# #         '''
+#         pools.end_profiling()
+#         return super(NoDaemonProcess, self).terminate() 
+                
 
 class NonDaemonPool(multiprocessing.pool.Pool):
     Process = NoDaemonProcess
 
 
-class MultiprocessThreadTask(task.Task):
+class MultiprocessThreadTask(nornir_pools.task.Task):
 
     def __init__(self, name, asyncresult, logger, *args, **kwargs):
 
-        self.name = name
-        self.args = args
-        self.kwargs = kwargs
+        super(MultiprocessThreadTask, self).__init__(name, *args, **kwargs)
+        #self.args = args
+        #self.kwargs = kwargs
         self.asyncresult = asyncresult
         self.logger = logger
 
@@ -134,14 +147,14 @@ class MultiprocessThreadTask(task.Task):
         return self.asyncresult.ready()
 
 
-class MultiprocessThread_Pool(poolbase.PoolBase):
+class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
 
     @property
     def tasks(self):
         if self._tasks is None:
-            self._tasks = NonDaemonPool(maxtasksperchild=32)
+            self._tasks = NonDaemonPool(maxtasksperchild=None)
 
         return self._tasks
 
@@ -170,13 +183,18 @@ class MultiprocessThread_Pool(poolbase.PoolBase):
 
         """Add a task to the queue"""
 
-        IncrementActiveJobCount()
-        PrintJobsCount()
+        
         # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
         # This hangs the caller if they wait on the task.
-        task = self.tasks.apply_async(func, args, kwargs, callback=callback)
-        return MultiprocessThreadTask(name, task, self.logger, args, kwargs)
+        added_task = self.tasks.apply_async(func, args, kwargs, callback=callback)
+        if added_task is None:
+            raise ValueError("apply_async returned None instead of an asyncresult object")
+        
+        IncrementActiveJobCount()
+        PrintJobsCount()
+        
+        return MultiprocessThreadTask(name, added_task, self.logger, args, kwargs)
 
     def wait_completion(self):
 
