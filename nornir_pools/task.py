@@ -54,6 +54,8 @@ class TaskWithEvent(Task):
     def __init__(self, name, *args, **kwargs):
         super(TaskWithEvent, self).__init__(name, *args, **kwargs)
         self.completed = threading.Event()  # The event that task creators can look at to know if the task completes
+        self.returncode = 0
+        
 
     @property
     def iscompleted(self):
@@ -67,3 +69,23 @@ class TaskWithEvent(Task):
 
     def wait(self):
         self.completed.wait()
+        
+
+class SerialTask(Task):
+    '''Used for debugging and profiling.  Returns a task object but the function has been run serially.'''
+     
+    def __init__(self, name, retval, *args, **kwargs):
+        super(SerialTask, self).__init__(name, *args, **kwargs)
+        self._retval = retval
+        self.returncode = 0
+        
+    @property
+    def iscompleted(self):
+        return True
+    
+    def wait(self):
+        return 
+    
+    def wait_return(self):
+        return self._retval
+    

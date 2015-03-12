@@ -9,10 +9,10 @@ import multiprocessing.pool
 import subprocess
 import socket
 import threading
+import logging
 # import copy_reg
 # import types
-import traceback
-import logging
+import traceback 
 import os
 import nornir_pools.task
 
@@ -109,14 +109,17 @@ class NonDaemonPool(multiprocessing.pool.Pool):
 
 
 class MultiprocessThreadTask(nornir_pools.task.Task):
+    
+    @property
+    def logger(self):
+        return logging.getLogger(__name__) 
 
-    def __init__(self, name, asyncresult, logger, *args, **kwargs):
+    def __init__(self, name, asyncresult, *args, **kwargs):
 
         super(MultiprocessThreadTask, self).__init__(name, *args, **kwargs)
         #self.args = args
         #self.kwargs = kwargs
-        self.asyncresult = asyncresult
-        self.logger = logger
+        self.asyncresult = asyncresult 
 
     def wait_return(self):
 
@@ -160,8 +163,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
     def __init__(self, num_threads=None):
         self.shutdown_event = threading.Event()
-        self.logger = logging.getLogger(__name__)
-        self.logger.warn("Creating Multithreading Pool")
+       
 
         # self.manager =  multiprocessing.Manager()
         # self.tasks = multiprocessing.Pool()
@@ -194,7 +196,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         IncrementActiveJobCount()
         PrintJobsCount()
         
-        return MultiprocessThreadTask(name, added_task, self.logger, args, kwargs)
+        return MultiprocessThreadTask(name, added_task, args, kwargs)
 
     def wait_completion(self):
 

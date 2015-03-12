@@ -89,13 +89,13 @@ class LocalThreadPoolBase(PoolBase):
             return False
             
         return True
-     
-    def __keep_alive_thread_func(self):
-        self.tasks.join()
-    
-    def __start_keep_alive_thread(self):
-        self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
-        self.keep_alive_thread.start()
+#      
+#     def __keep_alive_thread_func(self):
+#         self.tasks.join()
+#     
+#     def __start_keep_alive_thread(self):
+#         self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
+#         self.keep_alive_thread.start()
         
     def add_worker_thread(self):
         raise NotImplementedError("add_worker_thread must be implemented by derived class and return a thread object")
@@ -120,8 +120,8 @@ class LocalThreadPoolBase(PoolBase):
         #if num_threads_created > 0:
             #self.logger.warn("Created %d threads for pool" % (num_threads_created))
         
-        if not self.__has_keep_alive_thread():
-            self.__start_keep_alive_thread()
+        #if not self.__has_keep_alive_thread():
+        #    self.__start_keep_alive_thread()
                 
     
     def remove_finished_threads(self):

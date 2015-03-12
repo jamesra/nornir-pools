@@ -15,27 +15,35 @@ class LocalMachinePool(poolbase.PoolBase):
     @property
     def _multithreading_pool(self):
         if self._mtpool is None:
-            self._mtpool = nornir_pools.GetMultithreadingPool(self.Name + " multithreading pool", self._num_threads)
+            
+            if self.is_global:
+                self._mtpool = nornir_pools.GetGlobalMultithreadingPool()
+            else:
+                self._mtpool = nornir_pools.GetMultithreadingPool(self.Name + " multithreading pool", self._num_threads)
         
         return self._mtpool
 
     @property
     def _process_pool(self):
         if self._ppool is None:
-            self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)
+            if self.is_global:
+                self._ppool = nornir_pools.GetGlobalProcessPool()
+            else:
+                self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)
             
         return self._ppool
 
     def get_active_nodes(self):
         return ["localhost"]
 
-    def __init__(self, num_threads):
+    def __init__(self, num_threads, is_global = False):
         '''
         Constructor
         '''
 
         self._num_threads = num_threads
         
+        self.is_global = is_global
         self._mtpool = None
         self._ppool = None
  
