@@ -125,6 +125,8 @@ def GetSerialPool(Poolname=None, num_threads=None):
     '''
     Get or create a specific thread pool using vanilla python threads    
     '''
+    if Poolname is None:
+        raise ValueError("Must supply a pool name")
     return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
 
 
