@@ -161,9 +161,6 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         
         self._next_thread_id = 0
         self.logger.warn("Creating Process Pool") 
-        #for _ in range(int(num_threads)):
-            #Worker(self.tasks, self.shutdown_event)
-
         
     def add_worker_thread(self):
          
@@ -171,13 +168,6 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         w.name = "Process pool #%d" % (self._next_thread_id)
         self._next_thread_id += 1
         return w
-
-#     def __del__(self):
-#         self.wait_completion()
-#         # Close all of our threads
-#         self.shutdown_event.set()
-#
-#         # time.sleep(Worker.WaitTime + 1)
 
 
     def add_process(self, name, func, *args, **kwargs):
