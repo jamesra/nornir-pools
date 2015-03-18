@@ -26,19 +26,19 @@ JobCountLock = Lock()
 ActiveJobCount = 0
 
 def IncrementActiveJobCount():
-    global JobCountLock
+    #global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount + 1
-    JobCountLock.release()
+    #JobCountLock.acquire(True)
+    ActiveJobCount += 1
+    #JobCountLock.release()
 
 
 def DecrementActiveJobCount():
-    global JobCountLock
+    #global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount - 1
-    JobCountLock.release()
+    #JobCountLock.acquire(True)
+    ActiveJobCount -= 1
+    #JobCountLock.release()
 
 
 def PrintJobsCount():
@@ -69,14 +69,6 @@ def _unpickle_method(func_name, obj, cls):
 
 # copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
-def callback(result):
-    DecrementActiveJobCount()
-    PrintJobsCount()
-
-def callbackontaskfail(task):
-    '''This is manually invoked by the task when a thread fails to complete'''
-    DecrementActiveJobCount()
-    PrintJobsCount()
 
 class NoDaemonProcess(multiprocessing.Process):
 
@@ -113,6 +105,20 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
     @property
     def logger(self):
         return logging.getLogger(__name__) 
+        
+        
+    def callback(self, result):
+        DecrementActiveJobCount()
+        PrintJobsCount()
+        self.set_completion_time()
+        #self.logger.info("%s" % str(self.__str__()))
+        pools._sprint("%s" % str(self.__str__()))
+    
+    def callbackontaskfail(self, task):
+        '''This is manually invoked by the task when a thread fails to complete'''
+        DecrementActiveJobCount()
+        PrintJobsCount()
+        self.set_completion_time()
 
     def __init__(self, name, asyncresult, *args, **kwargs):
 
@@ -126,10 +132,11 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         """Waits until the function has completed execution and returns the value returned by the function pointer"""
         retval = self.asyncresult.get()
         if self.asyncresult.successful():
+            #self.logger.info("Multiprocess successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs)
             return retval
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            callbackontaskfail(self)
+            self.callbackontaskfail(self)
             return None
 
     def wait(self):
@@ -141,7 +148,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
             return
         else:
             self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            callbackontaskfail(self)
+            self.callbackontaskfail(self)
             self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation
             return None
 
@@ -162,24 +169,10 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         return self._tasks
 
     def __init__(self, num_threads=None):
-        self.shutdown_event = threading.Event()
-       
-
-        # self.manager =  multiprocessing.Manager()
-        # self.tasks = multiprocessing.Pool()
         self._tasks = None
-        # for _ in range(num_threads): Worker(self.tasks,self.shutdown_event)
 
     def shutdown(self):
         self.wait_completion()
-
-
-#     def __del__(self):
-#
-#         if hasattr(self, 'tasks'):
-#             self.tasks.close()
-#             self.tasks.join()
-#             self._tasks = None
 
     def add_task(self, name, func, *args, **kwargs):
 
@@ -189,14 +182,16 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
         # This hangs the caller if they wait on the task.
-        added_task = self.tasks.apply_async(func, args, kwargs, callback=callback)
-        if added_task is None:
+        
+        retval_task = MultiprocessThreadTask(name, None, args, kwargs)
+        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs, callback=retval_task.callback)
+        if retval_task.asyncresult is None:
             raise ValueError("apply_async returned None instead of an asyncresult object")
         
         IncrementActiveJobCount()
         PrintJobsCount()
         
-        return MultiprocessThreadTask(name, added_task, args, kwargs)
+        return retval_task
 
     def wait_completion(self):
 
