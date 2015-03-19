@@ -112,7 +112,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         PrintJobsCount()
         self.set_completion_time()
         #self.logger.info("%s" % str(self.__str__()))
-        pools._sprint("%s" % str(self.__str__()))
+        #pools._sprint("%s" % str(self.__str__()))
     
     def callbackontaskfail(self, task):
         '''This is manually invoked by the task when a thread fails to complete'''
