@@ -4,9 +4,11 @@ Created on Apr 17, 2014
 @author: u0490822
 '''
 
+import subprocess
 import nornir_pools
 from . import poolbase
 import nornir_pools.task
+import nornir_pools.processpool
 
 class SerialPool(poolbase.PoolBase):
     '''
@@ -39,7 +41,18 @@ class SerialPool(poolbase.PoolBase):
         
 
     def add_process(self, name, func, *args, **kwargs):
-        return self._process_pool.add_process(name, func, *args, **kwargs)
+        SingleParameterProc = subprocess.Popen(func + " && exit", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        entry =  nornir_pools.processpool.ProcessTask(name, func, *args, **kwargs)
+        entry.returned_value = SingleParameterProc.communicate(input)
+        entry.stdoutdata = entry.returned_value[0].decode('utf-8')
+        entry.stderrdata = entry.returned_value[1].decode('utf-8')
+        entry.returncode = SingleParameterProc.returncode
+        entry.completed.set()
+        
+        return entry 
+        
+        #return self._process_pool.add_process(name, func, *args, **kwargs)
 
     def wait_completion(self):
 
