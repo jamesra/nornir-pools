@@ -27,7 +27,7 @@ if __name__ == '__main__':
     setup(name='nornir_pools',
           zip_safe=True,
           classifiers=classifiers,
-          version='1.2.2',
+          version='1.3.0',
           description="A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface",
           author="James Anderson",
           author_email="James.R.Anderson@utah.edu",
