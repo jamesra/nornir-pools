@@ -142,9 +142,8 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
         assert(pool.__class__ == poolclass)
         return dictKnownPools[Poolname]
 
-        
-    logger = logging.getLogger(__name__)
-    logger.warn("Creating %s pool of type %s" % (Poolname, poolclass))
+         
+    logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
     
     pool = poolclass(num_threads, *args, **kwargs)
     pool.Name = Poolname

@@ -4,14 +4,11 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
-import math
-import multiprocessing
-from six.moves import queue
-import sys
+import math  
 import threading
 import time
 import traceback
-import logging
+#import logging
 
 import nornir_pools.task as task
 

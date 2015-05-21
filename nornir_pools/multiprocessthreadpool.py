@@ -3,17 +3,9 @@
 # Initially patterned from http://code.activestate.com/recipes/577187-python-thread-pool/
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
-
-import multiprocessing
+ 
 import multiprocessing.pool
-import subprocess
-import socket
-import threading
 import logging
-# import copy_reg
-# import types
-import traceback 
-import os
 import nornir_pools.task
 
 import nornir_pools as pools 
@@ -102,9 +94,9 @@ class NonDaemonPool(multiprocessing.pool.Pool):
 
 class MultiprocessThreadTask(nornir_pools.task.Task):
     
-    @property
-    def logger(self):
-        return logging.getLogger(__name__) 
+    #@property
+    #def logger(self):
+    #    return logging.getLogger(__name__) 
         
         
     def callback(self, result):
@@ -135,7 +127,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
             #self.logger.info("Multiprocess successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs)
             return retval
         else:
-            self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            #self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
             self.callbackontaskfail(self)
             return None
 
@@ -147,7 +139,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         if self.asyncresult.successful():
             return
         else:
-            self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            #self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
             self.callbackontaskfail(self)
             self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation
             return None
