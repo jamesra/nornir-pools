@@ -4,16 +4,13 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
-import math
-import multiprocessing
-from six.moves import queue
+import math 
 import sys
 import threading
 import time
 import traceback
 import subprocess
-import logging
-import os
+#import logging 
 
 import nornir_pools as pools
 from . import poolbase
@@ -102,7 +99,7 @@ class Worker(threading.Thread):
                 # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
                 error_message = "\n*** {0}\n{1}\n{2}\n".format(entry.name, entry.args, traceback.format_exc())
-                logger.error(error_message)
+                #logger.error(error_message)
                 sys.stderr.write(error_message)
 
                 entry.exception = e
@@ -135,7 +132,7 @@ class Worker(threading.Thread):
             out_string = "--- {0}".format(entry.name)
             out_string += " " * (time_position - len(out_string))
             out_string += time_str
-            logging.info(out_string)
+            #logging.info(out_string)
 
 #            _sprint (out_string)
             JobsQueued = self.tasks.qsize()
@@ -160,7 +157,7 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
         
         self._next_thread_id = 0
-        self.logger.warn("Creating Process Pool") 
+        #self.logger.warn("Creating Process Pool") 
         
     def add_worker_thread(self):
          

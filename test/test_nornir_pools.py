@@ -384,5 +384,5 @@ class TestClusterPool(unittest.TestCase):
 
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
-    multiprocessing.freeze_support()
-    # unittest.main()
+    #multiprocessing.freeze_support()
+    unittest.main()
