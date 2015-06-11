@@ -36,7 +36,7 @@ def ReadFile(path, number):
 
     return int(numStr)
 
-def SleepForRandomTime(MaxTime=2.0):
+def SleepForRandomTime(MaxTime=0.25):
     sleepTime = random.random() * MaxTime
     time.sleep(sleepTime)
 
@@ -196,6 +196,8 @@ class PoolTestBase(unittest.TestCase):
         self.skipTest("PoolTestBase, no test implemented")
 
     def tearDown(self):
+        pools.ClosePools()
+        pools.aggregate_profiler_data(os.path.join(self.TestOutputPath, 'aggregate_pools.profile'))
         if os.path.exists(self.TestOutputPath):
             shutil.rmtree(self.TestOutputPath)
 
@@ -382,5 +384,5 @@ class TestClusterPool(unittest.TestCase):
 
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
-    multiprocessing.freeze_support()
-    # unittest.main()
+    #multiprocessing.freeze_support()
+    unittest.main()

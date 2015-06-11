@@ -66,11 +66,19 @@ import os
 import sys
 import datetime
 import warnings
+import threading
+import cProfile
+import pstats
+import glob
+import shutil
+import six
+import logging
 
 import nornir_pools.processpool
 import nornir_pools.threadpool
 import nornir_pools.multiprocessthreadpool
 import nornir_pools.local_machine_pool
+import nornir_pools.serialpool
 
 __ParallelPythonAvailable = False
 
@@ -83,6 +91,7 @@ except ImportError as e:
 dictKnownPools = {}
 
 
+
 def GetThreadPool(Poolname=None, num_threads=None):
     '''
     Get or create a specific thread pool using vanilla python threads    
@@ -90,9 +99,9 @@ def GetThreadPool(Poolname=None, num_threads=None):
     return __CreatePool(nornir_pools.threadpool.Thread_Pool, Poolname, num_threads)
 
 
-def GetLocalMachinePool(Poolname=None, num_threads=None):
+def GetLocalMachinePool(Poolname=None, num_threads=None, is_global=False):
 
-    return __CreatePool(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads,is_global=is_global)
 
 
 def GetMultithreadingPool(Poolname=None, num_threads=None):
@@ -112,7 +121,16 @@ def GetParallelPythonPool(Poolname=None, num_threads=None):
     return __CreatePool(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
-def __CreatePool(poolclass, Poolname=None, num_threads=None):
+def GetSerialPool(Poolname=None, num_threads=None):
+    '''
+    Get or create a specific thread pool using vanilla python threads    
+    '''
+    if Poolname is None:
+        raise ValueError("Must supply a pool name")
+    return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
+
+
+def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
 
     global dictKnownPools
 
@@ -124,20 +142,28 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None):
         assert(pool.__class__ == poolclass)
         return dictKnownPools[Poolname]
 
-    pool = poolclass(num_threads)
+         
+    logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
+    
+    pool = poolclass(num_threads, *args, **kwargs)
     pool.Name = Poolname
 
     dictKnownPools[Poolname] = pool
 
     return pool
 
-
+def GetGlobalSerialPool():
+    '''
+    Common pool for processes on the local machine
+    '''
+    return GetSerialPool(Poolname="Global")
+    # return GetProcessPool("Global local process pool")
 
 def GetGlobalProcessPool():
     '''
     Common pool for processes on the local machine
     '''
-    return GetGlobalLocalMachinePool()
+    return GetProcessPool(Poolname="Global process pool")
     # return GetProcessPool("Global local process pool")
 
 def GetGlobalLocalMachinePool():
@@ -145,7 +171,7 @@ def GetGlobalLocalMachinePool():
     Common pool for launching other processes for threads or executables.  Combines multithreading and process pool interface.
     '''
 
-    return GetLocalMachinePool("Global local machine pool")
+    return GetLocalMachinePool(Poolname="Global local machine pool", is_global=True)
 
 def GetGlobalClusterPool():
     '''
@@ -169,23 +195,38 @@ def GetGlobalMultithreadingPool():
     '''
     Common pool for multithreading module tasks, threads run in different python processes to work around the global interpreter lock
     '''
-    return GetGlobalLocalMachinePool()
-    # return GetMultithreadingPool("Global multithreading pool")
+    # return GetGlobalLocalMachinePool()
+    return GetMultithreadingPool("Global multithreading pool")
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
 __LastConsoleWrite = datetime.datetime.utcnow()
 
 
-def __EclipseConsoleWrite(s, newline=False):
+def __CleanOutputForEclipse(s):
     s = s.replace('\b', '');
     s = s.replace('.', '');
     s = s.strip();
 
+    return s
+
+
+def __EclipseConsoleWrite(s, newline=False):
+
+    es = __CleanOutputForEclipse(s)    
     if newline:
-        s = s + '\n'
+        es = es + '\n'
+ 
+    sys.stdout.write(es)
+    
+    
+def __EclipseConsoleWriteError(s, newline=False):
 
-    sys.stdout.write(s)
-
+    es = __CleanOutputForEclipse(s)    
+    if newline:
+        es = es + '\n'
+ 
+    sys.stderr.write(es)
+     
 
 def __PrintProgressUpdateEclipse(s):
     global __LastConsoleWrite
@@ -205,6 +246,20 @@ def __ConsoleWrite(s, newline=False):
         s = s + '\n'
 
     sys.stdout.write(s)
+    
+def __ConsoleWriteError(s, newline=False):
+    if newline:
+        s = s + '\n'
+
+    sys.stderr.write(s)
+    
+
+def _PrintError(s):
+    if  'ECLIPSE' in os.environ:
+        __EclipseConsoleWrite(s)
+        return
+
+    __ConsoleWriteError(s, newline=True)
 
 
 def _PrintWarning(s):
@@ -244,18 +299,113 @@ def _pprint(s):
         __ConsoleWrite(s, newline=False)
 
 
+profiler = None
+profile_data_path = None
+
+def GetAndCreateProfileDataPath():  
+    
+    profile_data_path = os.path.join(os.getcwd(), 'pool_profiles')
+    #profile_data_path = os.path.join("C:\\Temp\\Testoutput\\PoolTestBase\\", 'pool_profiles')
+    if not os.path.exists(profile_data_path):
+        os.makedirs(profile_data_path)
+        
+    return profile_data_path
+
+def GetAndCreateProfileDataFileName():  
+    
+    profile_data_path = GetAndCreateProfileDataPath()
+        
+    thread =  threading.current_thread()
+    filename = "%d_%d.profile" % (os.getpid(), thread.ident)
+    profile_data_file = os.path.join(profile_data_path, filename)
+    return profile_data_file
+
+def start_profiling():
+    return
+#     global profiler
+#     
+#     if not profiler is None:
+#         #print("Profiler already initialized for pool")
+#         return 
+#     
+#     profiler = cProfile.Profile()
+#     profiler.enable()
+#     atexit.register(end_profiling())
+    
+def end_profiling():
+    return
+#     global profiler
+#     if not profiler is None:
+#         profile_data_path = GetAndCreateProfileDataFileName()
+#         profiler.dump_stats(profile_data_path)
+#         profiler = None
+    
+def invoke_with_profiler(func, *args, **kwargs):
+#    '''Launch a profiler for our function
+     
+    func_args = args
+    
+    start_profiling()
+    func(*func_args, **kwargs)
+    
+def aggregate_profiler_data(output_path):
+    return
+#     profile_data_path = GetAndCreateProfileDataPath()
+#     files = glob.glob(os.path.join(profile_data_path, "*.profile"))
+#     
+#     if len(files) == 0:
+#         return 
+#     
+#     profile_stats = None 
+#     if six.PY2:
+#         profile_stats = pstats.Stats(files[0])
+#         if len(files) > 1:
+#             for i in range(1,len(files)):
+#                 try:
+#                     profile_stats.add(files[i])
+#                     
+#                 except EOFError:
+#                     print("Could not include profile file %s" % f)
+#                     pass
+#     else:
+#         profile_stats = pstats.Stats()
+#         for f in files:
+#             try:
+#                 profile_stats.add(f)
+#             except  EOFError:
+#                 print("Could not include profile file %s" % f)
+#                 pass
+#         
+#     profile_stats.dump_stats(output_path)
+#     
+#     for f in files:
+#         os.remove(f)
+#      
+
+def WaitOnAllPools():
+    global dictKnownPools
+    for (key, pool) in list(dictKnownPools.items()):
+        _sprint("Waiting on pool: " + key)
+        pool.wait_completion()
+    
 def ClosePools():
     '''
     Shutdown all pools.
     
     '''
     global dictKnownPools
+    global profiler
 
     for (key, pool) in list(dictKnownPools.items()):
         _sprint("Waiting on pool: " + key)
         pool.shutdown()
+        del pool 
 
     dictKnownPools.clear()
+     
 
 
 atexit.register(ClosePools)
+
+if __name__ == '__main__':
+    start_profiling()

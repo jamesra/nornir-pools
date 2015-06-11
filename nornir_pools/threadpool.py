@@ -4,14 +4,11 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
-import math
-import multiprocessing
-from six.moves import queue
-import sys
+import math  
 import threading
 import time
 import traceback
-import logging
+#import logging
 
 import nornir_pools.task as task
 
@@ -180,10 +177,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
 
         self.logger.info("Creating Thread Pool") 
         return
-
-    def __keep_alive_thread_func(self):
-        self.tasks.join()
-        
+         
     def add_worker_thread(self):
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
         w.name = "Thread pool #%d" % (self._next_thread_id)

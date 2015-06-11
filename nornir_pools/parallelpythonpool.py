@@ -10,9 +10,6 @@ import traceback
 import subprocess
 from threading import Lock
 import socket
-
-import pp
-
 from . import task
 
 import nornir_pools as pools

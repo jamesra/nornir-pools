@@ -65,7 +65,7 @@ class LocalThreadPoolBase(PoolBase):
         self.deadthreadqueue = queue.Queue() #Threads put themselves here when they die
         self.shutdown_event = threading.Event()
         self.shutdown_event.clear()
-        self.keep_alive_thread = None
+        #self.keep_alive_thread = None
         self._threads = []
          
         self.WorkerCheckInterval=kwargs.get('WorkerCheckInterval', 0.5)
@@ -80,23 +80,7 @@ class LocalThreadPoolBase(PoolBase):
         # Give threads time to die gracefully
         time.sleep(self.WorkerCheckInterval + 1)
         del self._threads
-        
-    def __has_keep_alive_thread(self):
-        
-        if self.keep_alive_thread is None:
-            return False
-        elif self.keep_alive_thread.is_alive() == False:
-            return False
-            
-        return True
-     
-    def __keep_alive_thread_func(self):
-        self.tasks.join()
-    
-    def __start_keep_alive_thread(self):
-        self.keep_alive_thread = threading.Thread(group=None, target=self.__keep_alive_thread_func, name="Thread_Pool keep alive thread")
-        self.keep_alive_thread.start()
-        
+#         
     def add_worker_thread(self):
         raise NotImplementedError("add_worker_thread must be implemented by derived class and return a thread object")
     
@@ -116,14 +100,7 @@ class LocalThreadPoolBase(PoolBase):
                 
             else:
                 break
-        
-        #if num_threads_created > 0:
-            #self.logger.warn("Created %d threads for pool" % (num_threads_created))
-        
-        if not self.__has_keep_alive_thread():
-            self.__start_keep_alive_thread()
-                
-    
+            
     def remove_finished_threads(self):
         while not self.deadthreadqueue.empty():
             try:
