@@ -10,6 +10,7 @@ import nornir_pools as pools
 import time
 import random
 import multiprocessing
+import collections
 
 
 def CreateFile(path, number):
@@ -37,8 +38,10 @@ def ReadFile(path, number):
     return int(numStr)
 
 def SleepForRandomTime(MaxTime=0.25):
+    '''Sleep for a random amount of time and return the pid we slept on'''
     sleepTime = random.random() * MaxTime
     time.sleep(sleepTime)
+    return os.getpid()
 
 def CreateFileWithDelay(path, number):
         '''Create a file in the path whose name is [number].txt
@@ -116,7 +119,21 @@ def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsIn
 
     return
 
+def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
 
+    if not numTasksInTest:
+        numTasksInTest = multiprocessing.cpu_count() * 4
+
+    tasks = []
+    for i in range(1, numTasksInTest):
+        t = TPool.add_task(str(i), SleepForRandomTime)
+        tasks.append(t)
+
+    TPool.wait_completion()
+
+    pid_collection = collections.Counter([p.wait_return() for p in tasks])
+    self.assertTrue(len(pid_collection) == multiprocessing.cpu_count(), "All processes should have done work")
+    
 
 def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
 
@@ -229,9 +246,12 @@ class TestThreadPool(TestThreadPoolBase):
         runFunctionOnPool(self, TPool)
         runFileIOOnPool(self, TPool)
 
+        #No need to test even distribution of work because the threads are all in the same process
+        #runEvenDistributionOfWorkTestOnThePool(self,TPool)
+
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
-        runFileIOOnPool(self, TPool)
+        runFileIOOnPool(self, TPool) 
 
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
@@ -252,6 +272,7 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
 
         runFunctionOnPool(self, TPool)
         runFileIOOnPool(self, TPool)
+        runEvenDistributionOfWorkTestOnThePool(self,TPool)
 
         TPool = pools.GetMultithreadingPool("Test multithreading pool")
         self.assertIsNotNone(TPool)
@@ -268,6 +289,7 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
 
         runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
         runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runEvenDistributionOfWorkTestOnThePool(self,TPool)
 
 
 class TestThreadPoolWithRandomDelay(TestThreadPool):
@@ -280,6 +302,8 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
 
         runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
         runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        
+        #runEvenDistributionOfWorkTestOnThePool(self,TPool)
 
 class TestProcessPool(unittest.TestCase):
 
@@ -320,6 +344,7 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
         runFunctionOnPool(self, PPool)
         runFunctionOnPool(self, PPool, Func=SquareTheNumberWithDelay)
         runFileIOOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        runEvenDistributionOfWorkTestOnThePool(self,PPool)
 
         VerifyExceptionBehaviour(self, PPool)
 

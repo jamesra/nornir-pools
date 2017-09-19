@@ -8,7 +8,7 @@ import sys
 import time
 import traceback
 import subprocess
-from threading import Lock
+# from threading import Lock
 import socket
 from . import task
 
@@ -16,25 +16,23 @@ import nornir_pools as pools
 from . import poolbase
 
 NextGroupName = 0
-
-JobCountLock = Lock()
+# JobCountLock = Lock()
 ActiveJobCount = 0
 
-
 def IncrementActiveJobCount():
-    global JobCountLock
+    # global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
+    # JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount + 1
-    JobCountLock.release()
+    # JobCountLock.release()
 
 
 def DecrementActiveJobCount():
-    global JobCountLock
+    # global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
+    # JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount - 1
-    JobCountLock.release()
+    # JobCountLock.release()
 
 
 def PrintJobsCount():

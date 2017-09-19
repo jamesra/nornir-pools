@@ -12,9 +12,8 @@ import nornir_pools as pools
 
 from threading import Lock 
 
-# import pools
 
-JobCountLock = Lock()
+#JobCountLock = Lock()
 ActiveJobCount = 0
 
 def IncrementActiveJobCount():
@@ -39,25 +38,27 @@ def PrintJobsCount():
     JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)))
     pools._PrintProgressUpdate (JobQText)
 
+# import pools
 
-def _pickle_method(method):
-    func_name = method.__func__.__name__
-    obj = method.__self__
-    cls = method.__self__.__class__
-    if func_name.startswith('__') and not func_name.endswith('__'):  # deal with mangled names
-        cls_name = cls.__name__.lstrip('_')
-        func_name = '_' + cls_name + func_name
-    return _unpickle_method, (func_name, obj, cls)
-
-def _unpickle_method(func_name, obj, cls):
-    for cls in cls.__mro__:
-        try:
-            func = cls.__dict__[func_name]
-        except KeyError:
-            pass
-        else:
-            break
-    return func.__get__(obj, cls)
+# 
+# def _pickle_method(method):
+#     func_name = method.__func__.__name__
+#     obj = method.__self__
+#     cls = method.__self__.__class__
+#     if func_name.startswith('__') and not func_name.endswith('__'):  # deal with mangled names
+#         cls_name = cls.__name__.lstrip('_')
+#         func_name = '_' + cls_name + func_name
+#     return _unpickle_method, (func_name, obj, cls)
+# 
+# def _unpickle_method(func_name, obj, cls):
+#     for cls in cls.__mro__:
+#         try:
+#             func = cls.__dict__[func_name]
+#         except KeyError:
+#             pass
+#         else:
+#             break
+#     return func.__get__(obj, cls)
 
 # copy_reg.pickle(types.MethodType, _pickle_method, _unpickle_method)
 
@@ -89,7 +90,8 @@ class NoDaemonProcess(multiprocessing.Process):
                 
 
 class NonDaemonPool(multiprocessing.pool.Pool):
-    Process = NoDaemonProcess
+    def Process(self, *args, **kwds):
+        return NoDaemonProcess(*args, **kwds)
 
 
 class MultiprocessThreadTask(nornir_pools.task.Task):
@@ -193,3 +195,4 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
             self.tasks.close()
             self.tasks.join()
             self._tasks = None
+ 
