@@ -8,7 +8,7 @@ import multiprocessing.pool
 import logging
 import nornir_pools.task
 
-import nornir_pools as pools 
+import nornir_pools
 
 from threading import Lock 
 
@@ -36,9 +36,9 @@ def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount)
     JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)))
-    pools._PrintProgressUpdate (JobQText)
+    nornir_pools._PrintProgressUpdate (JobQText)
 
-# import pools
+# import nornir_pools
 
 # 
 # def _pickle_method(method):
@@ -77,7 +77,7 @@ class NoDaemonProcess(multiprocessing.Process):
 #         '''
 #         Method to be run in sub-process; can be overridden in sub-class
 #         '''
-#         pools.start_profiling()
+#         nornir_pools.start_profiling()
 #         retval = super(NoDaemonProcess, self).run() 
 #         return retval
 # #         
@@ -85,7 +85,7 @@ class NoDaemonProcess(multiprocessing.Process):
 # #         '''
 # #         Terminate process; sends SIGTERM signal or uses TerminateProcess()
 # #         '''
-#         pools.end_profiling()
+#         nornir_pools.end_profiling()
 #         return super(NoDaemonProcess, self).terminate() 
                 
 
@@ -106,7 +106,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         PrintJobsCount()
         self.set_completion_time()
         #self.logger.info("%s" % str(self.__str__()))
-        #pools._sprint("%s" % str(self.__str__()))
+        #nornir_pools._sprint("%s" % str(self.__str__()))
     
     def callbackontaskfail(self, task):
         '''This is manually invoked by the task when a thread fails to complete'''

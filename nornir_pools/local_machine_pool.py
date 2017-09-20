@@ -46,7 +46,7 @@ class LocalMachinePool(poolbase.PoolBase):
         self.is_global = is_global
         self._mtpool = None
         self._ppool = None
- 
+
 
     def add_task(self, name, func, *args, **kwargs):
         return self._multithreading_pool.add_task(name, func, *args, **kwargs)

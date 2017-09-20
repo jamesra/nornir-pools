@@ -12,7 +12,7 @@ import traceback
 
 import nornir_pools.task as task
 
-import nornir_pools as pools
+import nornir_pools
 import nornir_pools.poolbase as poolbase
 
 
@@ -156,7 +156,7 @@ class Worker(threading.Thread):
 
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-                pools._PrintProgressUpdate(JobQText)
+                nornir_pools._PrintProgressUpdate(JobQText)
 
             self.tasks.task_done()
 
