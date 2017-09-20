@@ -12,7 +12,7 @@ import traceback
 import subprocess
 #import logging 
 
-import nornir_pools as pools
+import nornir_pools
 from . import poolbase
 
 from . import task
@@ -23,14 +23,42 @@ class ProcessTask(task.TaskWithEvent):
     def __init__(self, name, func, *args, **kwargs):
         super(ProcessTask, self).__init__(name, *args, **kwargs)
         self.cmd = func
+        self.Run()
+
+    def Run(self):
+        self.proc = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *self.args, **self.kwargs)
 
     def wait(self):
-        super(ProcessTask, self).wait()
+        if self.proc is None:
+            return
+
+        self.returned_value = self.proc.communicate()
+        self._handle_proc_completion()
 
         if hasattr(self, 'exception'):
             raise self.exception
         elif self.returncode < 0:
             raise Exception("Negative return code from task but no exception detail provided")
+
+        self.proc = None
+        return
+
+    @property
+    def iscompleted(self):
+        if self.proc:
+            if self.proc.poll() is not None:
+                self.wait()
+                return True
+            else:
+                return False
+
+    def _handle_proc_completion(self):
+
+        self.stdoutdata = self.returned_value[0].decode('utf-8')
+        self.stderrdata = self.returned_value[1].decode('utf-8')
+
+        self.set_completion_time()
+        self.completed.set()
 
     def wait_return(self):
         self.wait()
@@ -50,10 +78,8 @@ class Worker(threading.Thread):
         self.daemon = True
         self.queue_wait_time = queue_wait_time
         #self.logger = logging.getLogger(__name__)
-        self.start() 
-
-    
-
+        self.start()  
+        
     def run(self):
         # print notification
         #logger = logging.getLogger(__name__ + '.Worker')
@@ -86,11 +112,15 @@ class Worker(threading.Thread):
 
             try:
 
-                proc = subprocess.Popen(entry.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *entry.args, **entry.kwargs)
-                entry.returned_value = proc.communicate(input)
-                entry.stdoutdata = entry.returned_value[0].decode('utf-8')
-                entry.stderrdata = entry.returned_value[1].decode('utf-8')
-                entry.returncode = proc.returncode
+                proc = subprocess.Popen(entry.cmd, *entry.args, **entry.kwargs)
+                #proc = subprocess.Popen(entry.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *entry.args, **entry.kwargs)
+                #entry.returned_value = proc.communicate(input)
+                #entry.stdoutdata = entry.returned_value[0].decode('utf-8')
+                #entry.stderrdata = entry.returned_value[1].decode('utf-8')
+                entry.returned_value = (None, None)
+                entry.stdoutdata = None
+                entry.stderrdata = None
+                entry.returncode = proc.wait()
                 proc = None
 
             except Exception as e:
@@ -139,12 +169,12 @@ class Worker(threading.Thread):
             if JobsQueued > 0:
                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-                pools._PrintProgressUpdate (JobQText)
+                nornir_pools._PrintProgressUpdate (JobQText)
 
             self.tasks.task_done()
 
 
-class Process_Pool(poolbase.LocalThreadPoolBase):
+class Process_Pool(poolbase.PoolBase):
 
     """Pool of threads consuming tasks from a queue"""
     
@@ -154,17 +184,18 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
-        super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
+        #super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
         
-        self._next_thread_id = 0
-        #self.logger.warn("Creating Process Pool") 
+        #self._next_thread_id = 0
+        #self.logger.warn("Creating Process Pool")
+        self.tasks = []
         
-    def add_worker_thread(self):
+    #def add_worker_thread(self):
          
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
-        w.name = "Process pool #%d" % (self._next_thread_id)
-        self._next_thread_id += 1
-        return w
+        #w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        #w.name = "Process pool #%d" % (self._next_thread_id)
+        #self._next_thread_id += 1
+        #return w
 
 
     def add_process(self, name, func, *args, **kwargs):
@@ -182,8 +213,18 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
             kwargs['shell'] = True
 
         entry = ProcessTask(name, func, *args, **kwargs)
-        self.tasks.put(entry)
-        self.add_threads_if_needed()
+        self.tasks.append(entry)
+        #self.add_threads_if_needed()
+
+        unfinishedTasks = [t for t in self.tasks if t.iscompleted == False]
+        self.tasks = unfinishedTasks
 
         return entry
+    
+    def wait_completion(self):
+        [t.wait() for t in self.tasks]
+        self.tasks = []
+    
+    def shutdown(self):
+        self.wait_completion()
  
