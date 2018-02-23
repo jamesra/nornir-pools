@@ -46,7 +46,7 @@ class LocalMachinePool(poolbase.PoolBase):
         self.is_global = is_global
         self._mtpool = None
         self._ppool = None
- 
+
 
     def add_task(self, name, func, *args, **kwargs):
         return self._multithreading_pool.add_task(name, func, *args, **kwargs)
@@ -58,10 +58,12 @@ class LocalMachinePool(poolbase.PoolBase):
 
         """Wait for completion of all the tasks in the queue"""
         if not self._mtpool is None:
-            self._multithreading_pool.wait_completion()
-            
+            self._mtpool.wait_completion()
+            self._mtpool = None
+
         if not self._ppool is None:
-            self._process_pool.wait_completion()
-        
+            self._ppool.wait_completion()
+            self._ppool = None
+
     def shutdown(self):
         self.wait_completion()

@@ -8,40 +8,38 @@ import sys
 import time
 import traceback
 import subprocess
-from threading import Lock
+# from threading import Lock
 import socket
 from . import task
 
-import nornir_pools as pools
+import nornir_pools
 from . import poolbase
 
 NextGroupName = 0
-
-JobCountLock = Lock()
+# JobCountLock = Lock()
 ActiveJobCount = 0
 
-
 def IncrementActiveJobCount():
-    global JobCountLock
+    # global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
+    # JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount + 1
-    JobCountLock.release()
+    # JobCountLock.release()
 
 
 def DecrementActiveJobCount():
-    global JobCountLock
+    # global JobCountLock
     global ActiveJobCount
-    JobCountLock.acquire(True)
+    # JobCountLock.acquire(True)
     ActiveJobCount = ActiveJobCount - 1
-    JobCountLock.release()
+    # JobCountLock.release()
 
 
 def PrintJobsCount():
     global ActiveJobCount
     JobQText = "Jobs Queued: " + str(ActiveJobCount)
     JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-    pools._PrintProgressUpdate(JobQText)
+    nornir_pools._PrintProgressUpdate(JobQText)
 
 
 class CTask(task.TaskWithEvent):
@@ -88,8 +86,8 @@ class CTask(task.TaskWithEvent):
         self.completed.wait(300)
 
         if not self._callback_reached:
-            pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
-            pools._PrintWarning("We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
+            nornir_pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
+            nornir_pools._PrintWarning("We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
             self.completed.wait()
             # raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             self.completed.set()
@@ -206,7 +204,7 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
     def server(self):
         if self._server is None:
             self._server = pp.Server(ppservers=("*",))
-            pools._pprint("Creating server pool, wait three seconds for other servers to respond")
+            nornir_pools._pprint("Creating server pool, wait three seconds for other servers to respond")
             time.sleep(3)
 
             self._server.print_stats()

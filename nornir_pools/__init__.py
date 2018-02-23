@@ -59,6 +59,11 @@ It is not necessary to perform any cleanup.  Functions to delete pools would not
 
 .. autofunction:: nornir_pools.ClosePools
 
+Optimization
+------------
+
+On windows there is significant overhead to passing parameters to multiprocessing jobs.  To address this I added pickle overrides to objects being marshalled.  I also removed as many global initializations as I could from modules loaded by the tasks.
+
 '''
 
 import atexit
@@ -89,9 +94,7 @@ except ImportError as e:
     pass
 
 dictKnownPools = {}
-
-
-
+ 
 def GetThreadPool(Poolname=None, num_threads=None):
     '''
     Get or create a specific thread pool using vanilla python threads    
@@ -142,9 +145,8 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
         assert(pool.__class__ == poolclass)
         return dictKnownPools[Poolname]
 
-         
     logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
-    
+
     pool = poolclass(num_threads, *args, **kwargs)
     pool.Name = Poolname
 
@@ -303,7 +305,7 @@ profiler = None
 profile_data_path = None
 
 def GetAndCreateProfileDataPath():  
-    
+
     profile_data_path = os.path.join(os.getcwd(), 'pool_profiles')
     #profile_data_path = os.path.join("C:\\Temp\\Testoutput\\PoolTestBase\\", 'pool_profiles')
     if not os.path.exists(profile_data_path):
@@ -331,7 +333,7 @@ def start_profiling():
 #     profiler = cProfile.Profile()
 #     profiler.enable()
 #     atexit.register(end_profiling())
-    
+
 def end_profiling():
     return
 #     global profiler
@@ -339,15 +341,15 @@ def end_profiling():
 #         profile_data_path = GetAndCreateProfileDataFileName()
 #         profiler.dump_stats(profile_data_path)
 #         profiler = None
-    
+
 def invoke_with_profiler(func, *args, **kwargs):
 #    '''Launch a profiler for our function
-     
+
     func_args = args
-    
+
     start_profiling()
     func(*func_args, **kwargs)
-    
+
 def aggregate_profiler_data(output_path):
     return
 #     profile_data_path = GetAndCreateProfileDataPath()
@@ -387,11 +389,11 @@ def WaitOnAllPools():
     for (key, pool) in list(dictKnownPools.items()):
         _sprint("Waiting on pool: " + key)
         pool.wait_completion()
-    
+
 def ClosePools():
     '''
     Shutdown all pools.
-    
+
     '''
     global dictKnownPools
     global profiler
@@ -402,8 +404,6 @@ def ClosePools():
         del pool 
 
     dictKnownPools.clear()
-     
-
 
 atexit.register(ClosePools)
 
