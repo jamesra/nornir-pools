@@ -6,15 +6,14 @@ Created on Aug 30, 2013
 
 from ez_setup import use_setuptools
 
-
-
-
 if __name__ == '__main__':
     use_setuptools()
 
-    from setuptools import setup
+    from setuptools import setup, find_packages
 
     install_requires = ["six"]
+
+    packages = find_packages()
 
     # extras_require = {"pp" : ["pp"]}
     extras_require = {}
@@ -35,4 +34,4 @@ if __name__ == '__main__':
           install_requires=install_requires,
           tests_require=tests_require,
           extras_require=extras_require,
-          packages=["nornir_pools"], test_suite='test')
+          packages=packages, test_suite='test')
