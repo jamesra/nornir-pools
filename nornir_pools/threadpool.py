@@ -105,6 +105,9 @@ class Worker(threading.Thread):
             # _sprint("+")
 
             # do it!
+            
+            original_thread_name = self.name
+            self.name = entry.name
 
             try:
 
@@ -160,13 +163,15 @@ class Worker(threading.Thread):
 
             self.tasks.task_done()
 
+            self.name = original_thread_name
+
 
 class Thread_Pool(poolbase.LocalThreadPoolBase):
 
     """Pool of threads consuming tasks from a queue"""
     #How often workers check for new jobs in the queue
 
-    def __init__(self, num_threads=None,  WorkerCheckInterval = 0.5):
+    def __init__(self, num_threads=None,  WorkerCheckInterval = 1):
         '''
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
@@ -177,7 +182,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
 
         self.logger.info("Creating Thread Pool") 
         return
-         
+
     def add_worker_thread(self):
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
         w.name = "Thread pool #%d" % (self._next_thread_id)

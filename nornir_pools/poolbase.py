@@ -90,7 +90,7 @@ class LocalThreadPoolBase(PoolBase):
         num_active_threads = len(self._threads)
         
         num_threads_created = 0
-        while num_active_threads < self._max_threads:
+        while num_active_threads < min((self._max_threads, self.tasks.qsize()+1)):
             if not self.tasks.empty():
                 t = self.add_worker_thread()
                 assert(isinstance(t, threading.Thread))
