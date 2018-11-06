@@ -390,6 +390,7 @@ def WaitOnAllPools():
         _sprint("Waiting on pool: " + key)
         pool.wait_completion()
 
+@atexit.register
 def ClosePools():
     '''
     Shutdown all pools.
@@ -405,7 +406,23 @@ def ClosePools():
 
     dictKnownPools.clear()
 
-atexit.register(ClosePools)
+
+def MergeProfilerStats(root_output_dir, profile_dir, pool_name): 
+    '''Called by atexit.  Merges all *.profile files in the profile_dir into a single .profile file'''
+    profile_files = glob.glob(os.path.join(profile_dir, "**","*.pstats"), recursive=True)
+    
+    if len(profile_files) == 0:
+        return
+     
+    agg = pstats.Stats()
+    agg.add(*profile_files)
+    
+    output_full_path = os.path.join(root_output_dir, pool_name + '_aggregate.pstats')
+    agg.dump_stats(output_full_path)
+    
+    #Remove the individual .profile files
+    for f in profile_files:
+        os.remove(f)    
 
 if __name__ == '__main__':
     start_profiling()

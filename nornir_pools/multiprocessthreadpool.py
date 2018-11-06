@@ -4,14 +4,45 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
  
+import atexit
+import multiprocessing
+import tempfile
 import multiprocessing.pool
 import logging
 import nornir_pools.task
 
 import nornir_pools
 
-from threading import Lock 
+import cProfile
+import os
 
+#from threading import Lock
+
+_profiler = None
+ 
+def _poolinit(profile_dir=None):
+    
+    global _profiler
+    _profiler = None
+     
+    
+    if profile_dir is not None:
+        assert(isinstance(profile_dir, str))
+        _profiler = cProfile.Profile()
+        _profiler.enable()
+        
+        atexit.register(_processfinalizer, profile_dir)
+    
+def _processfinalizer(profile_dir):
+    
+    global _profiler
+    if _profiler is not None:
+        _profiler.disable()
+        profile_filename = str.format('mp-{0}.pstats', multiprocessing.current_process().pid)
+        profile_fullpath = os.path.join(profile_dir, profile_filename)
+        _profiler.dump_stats(profile_fullpath)
+        _profiler = None
+      
 
 #JobCountLock = Lock()
 ActiveJobCount = 0
@@ -72,15 +103,23 @@ class NoDaemonProcess(multiprocessing.Process):
         pass
 
     daemon = property(_get_daemon, _set_daemon)
-     
-#     def run(self):
+#          
+#     def run(self, *args, **kwargs):
 #         '''
 #         Method to be run in sub-process; can be overridden in sub-class
 #         '''
-#         nornir_pools.start_profiling()
-#         retval = super(NoDaemonProcess, self).run() 
+#         global _profiler
+#         
+#         if _profiler is not None:
+#             _profiler.enable()
+#              
+#         retval = super(NoDaemonProcess, self).run(*args, **kwargs) 
+#         
+#         if _profiler is not None:
+#             _profiler.disable()
+#         
 #         return retval
-# #         
+# # #         
 #     def terminate(self):
 # #         '''
 # #         Terminate process; sends SIGTERM signal or uses TerminateProcess()
@@ -90,6 +129,41 @@ class NoDaemonProcess(multiprocessing.Process):
                 
 
 class NonDaemonPool(multiprocessing.pool.Pool):
+    
+    _root_profile_output_dir = None
+    _instance_id = 0
+    
+    @classmethod
+    def _get_root_profile_output_path(cls):
+        if cls._root_profile_output_dir is None:
+            if os.path.isdir(os.environ['PROFILE']):
+                cls._root_profile_output_dir = os.environ['PROFILE'] 
+            else:
+                cls._root_profile_output_dir = tempfile.mkdtemp()
+            
+        return cls._root_profile_output_dir
+    
+    def __init__(self,*args, **kwargs):
+        self.profile_dir = None
+        self.pool_name = str.format("pool-pid_{0}_instance_{1}", multiprocessing.current_process().pid, NonDaemonPool._instance_id)
+        
+        NonDaemonPool._instance_id = NonDaemonPool._instance_id + 1 
+
+        #Create a directory to store profile data for each subprocess        
+        if 'PROFILE' in os.environ: 
+            root_output_dir = NonDaemonPool._get_root_profile_output_path()
+            self.profile_dir = os.path.join(root_output_dir, self.pool_name)
+                
+            os.makedirs(self.profile_dir, exist_ok=True)
+            
+            atexit.register(nornir_pools.MergeProfilerStats, root_output_dir, self.profile_dir, self.pool_name)
+            assert('initializer' not in kwargs)
+            
+            kwargs['initializer'] = _poolinit
+            kwargs['initargs'] = [self.profile_dir]
+                        
+        super(NonDaemonPool, self).__init__(*args, **kwargs) 
+        
     def Process(self, *args, **kwds):
         return NoDaemonProcess(*args, **kwds)
 
@@ -162,7 +236,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
         return self._tasks
 
-    def __init__(self, num_threads=None):
+    def __init__(self, num_threads=None,):
         self._tasks = None
 
     def shutdown(self):
