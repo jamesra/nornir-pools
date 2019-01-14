@@ -308,8 +308,7 @@ def GetAndCreateProfileDataPath():
 
     profile_data_path = os.path.join(os.getcwd(), 'pool_profiles')
     #profile_data_path = os.path.join("C:\\Temp\\Testoutput\\PoolTestBase\\", 'pool_profiles')
-    if not os.path.exists(profile_data_path):
-        os.makedirs(profile_data_path)
+    os.makedirs(profile_data_path, exist_ok=True)
         
     return profile_data_path
 
