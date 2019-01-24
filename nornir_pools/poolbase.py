@@ -68,12 +68,18 @@ class LocalThreadPoolBase(PoolBase):
         #self.keep_alive_thread = None
         self._threads = []
          
-        self.WorkerCheckInterval=kwargs.get('WorkerCheckInterval', 0.5)
+        self.WorkerCheckInterval=kwargs.get('WorkerCheckInterval', None)
+        if self.WorkerCheckInterval is None:
+            self.WorkerCheckInterval = 0.5
+        
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
         if self._max_threads is None:
             self._max_threads = multiprocessing.cpu_count()
         
     def shutdown(self):
+        if self.shutdown_event.isSet():
+            return
+        
         self.wait_completion()
         self.shutdown_event.set()
 
@@ -85,6 +91,8 @@ class LocalThreadPoolBase(PoolBase):
         raise NotImplementedError("add_worker_thread must be implemented by derived class and return a thread object")
     
     def add_threads_if_needed(self):
+        
+        assert(False == self.shutdown_event.isSet())
         
         self.remove_finished_threads()
         num_active_threads = len(self._threads)

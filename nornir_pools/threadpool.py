@@ -171,7 +171,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
     """Pool of threads consuming tasks from a queue"""
     #How often workers check for new jobs in the queue
 
-    def __init__(self, num_threads=None,  WorkerCheckInterval = 1):
+    def __init__(self, num_threads=None,  WorkerCheckInterval = None):
         '''
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
@@ -184,6 +184,8 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
         return
 
     def add_worker_thread(self):
+        assert(False == self.shutdown_event.isSet())
+        
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
         w.name = "Thread pool #%d" % (self._next_thread_id)
         self._next_thread_id += 1
@@ -192,7 +194,8 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
-
+        assert(False == self.shutdown_event.isSet())
+        
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
