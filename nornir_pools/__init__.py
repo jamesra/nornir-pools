@@ -94,6 +94,62 @@ except ImportError as e:
     pass
 
 dictKnownPools = {}
+
+
+def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
+
+    global dictKnownPools
+
+    if Poolname is None:
+        return GetGlobalLocalMachinePool()
+
+    if Poolname in dictKnownPools:
+        pool = dictKnownPools[Poolname]
+        assert(pool.__class__ == poolclass)
+        
+        return dictKnownPools[Poolname]
+
+    logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
+
+    pool = poolclass(num_threads, *args, **kwargs)
+    pool.name = Poolname
+
+    dictKnownPools[Poolname] = pool
+
+    return pool
+
+
+def WaitOnAllPools():
+    global dictKnownPools
+    for (key, pool) in list(dictKnownPools.items()):
+        _sprint("Waiting on pool: " + key)
+        pool.wait_completion()
+
+def _remove_pool(p):
+    '''Called from pool shutdown implementations to remove the pool from the map of existing pools'''
+    pname = p
+    if not isinstance(p, str):
+        pname = p.name 
+        
+    if pname in dictKnownPools:
+        del dictKnownPools[pname]
+
+@atexit.register
+def ClosePools():
+    '''
+    Shutdown all pools.
+
+    '''
+    global dictKnownPools
+    global profiler
+
+    for (key, pool) in list(dictKnownPools.items()):
+        _sprint("Waiting on pool: " + key)
+        pool.shutdown()
+        del pool 
+
+    dictKnownPools.clear()
+
  
 def GetThreadPool(Poolname=None, num_threads=None):
     '''
@@ -133,26 +189,6 @@ def GetSerialPool(Poolname=None, num_threads=None):
     return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
 
 
-def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
-
-    global dictKnownPools
-
-    if Poolname is None:
-        return GetGlobalLocalMachinePool()
-
-    if Poolname in dictKnownPools:
-        pool = dictKnownPools[Poolname]
-        assert(pool.__class__ == poolclass)
-        return dictKnownPools[Poolname]
-
-    logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
-
-    pool = poolclass(num_threads, *args, **kwargs)
-    pool.Name = Poolname
-
-    dictKnownPools[Poolname] = pool
-
-    return pool
 
 def GetGlobalSerialPool():
     '''
@@ -382,28 +418,6 @@ def aggregate_profiler_data(output_path):
 #     for f in files:
 #         os.remove(f)
 #      
-
-def WaitOnAllPools():
-    global dictKnownPools
-    for (key, pool) in list(dictKnownPools.items()):
-        _sprint("Waiting on pool: " + key)
-        pool.wait_completion()
-
-@atexit.register
-def ClosePools():
-    '''
-    Shutdown all pools.
-
-    '''
-    global dictKnownPools
-    global profiler
-
-    for (key, pool) in list(dictKnownPools.items()):
-        _sprint("Waiting on pool: " + key)
-        pool.shutdown()
-        del pool 
-
-    dictKnownPools.clear()
 
 
 def MergeProfilerStats(root_output_dir, profile_dir, pool_name): 

@@ -3,12 +3,20 @@ import threading
 import time
 import multiprocessing
 import logging
+import nornir_pools
 
 class PoolBase(object):
     '''
     Pool objects provide the interface to create tasks on the pool.
     '''
 
+    @property
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, val):
+        self._name = val
 
     def shutdown(self):
         '''
@@ -24,7 +32,7 @@ class PoolBase(object):
 
     def __init__(self, *args, **kwargs):
         self.logger = logging.getLogger(__name__)
-    
+        self._name = None
 
     def add_task(self, name, func, *args, **kwargs):
         '''
@@ -82,6 +90,8 @@ class LocalThreadPoolBase(PoolBase):
         
         self.wait_completion()
         self.shutdown_event.set()
+        
+        nornir_pools._remove_pool(self)
 
         # Give threads time to die gracefully
         time.sleep(self.WorkerCheckInterval + 1)

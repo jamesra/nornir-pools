@@ -241,6 +241,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
     def shutdown(self):
         self.wait_completion()
+        nornir_pools._remove_pool(self)
 
     def add_task(self, name, func, *args, **kwargs):
 
