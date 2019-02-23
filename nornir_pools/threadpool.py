@@ -8,6 +8,7 @@ import math
 import threading
 import time
 import traceback
+import queue
 #import logging
 
 import nornir_pools.task as task
@@ -70,30 +71,34 @@ class Worker(threading.Thread):
         self.shutdown_event = shutdown_event
         self.daemon = True
         
+        if queue_wait_time is None:
+            queue_wait_time = 5
+            
         self.queue_wait_time = queue_wait_time
         # self.logger = logging.getLogger(__name__)
         self.start()
         
 
     def run(self):
-
+        
         while True:
 
             # Get next task from the queue (blocks thread if queue is empty until entry arrives)
             try:
                 entry = self.tasks.get(True, self.queue_wait_time)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
-            except:
+            except queue.Empty as e:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
                     # _sprint ("Queue Empty, exiting worker thread")
                     self.deadthreadqueue.put(self)
                     return
-                else: 
+                else:
                     self.deadthreadqueue.put(self)
                     #logger.info("Thread #%d idle shutdown" % (self.ident))
-                    return  
-                    
-
+                    return
+                
+                continue
+                
             # Record start time so we get a sense of performance
 
             task_start_time = time.time()
@@ -186,8 +191,8 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
     def add_worker_thread(self):
         assert(False == self.shutdown_event.isSet())
         
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
-        w.name = "Thread pool #%d" % (self._next_thread_id)
+        worker_name = "Thread pool #%d" % (self._next_thread_id)
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval, name=worker_name) 
         self._next_thread_id += 1
         return w
 

@@ -59,11 +59,17 @@ class LocalMachinePool(poolbase.PoolBase):
         """Wait for completion of all the tasks in the queue"""
         if not self._mtpool is None:
             self._mtpool.wait_completion()
-            self._mtpool = None
 
         if not self._ppool is None:
-            self._ppool.wait_completion()
-            self._ppool = None
+            self._ppool.wait_completion() 
 
     def shutdown(self):
         self.wait_completion()
+        
+        if not self._mtpool is None:
+            self._mtpool.shutdown()
+            self._mtpool = None
+
+        if not self._ppool is None:
+            self._ppool.shutdown()
+            self._ppool = None 

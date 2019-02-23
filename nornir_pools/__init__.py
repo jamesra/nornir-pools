@@ -95,26 +95,32 @@ except ImportError as e:
 
 dictKnownPools = {}
 
+__pool_management_lock = threading.RLock()
 
 def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
 
     global dictKnownPools
-
-    if Poolname is None:
-        return GetGlobalLocalMachinePool()
-
-    if Poolname in dictKnownPools:
-        pool = dictKnownPools[Poolname]
-        assert(pool.__class__ == poolclass)
+    
+    try:
+        __pool_management_lock.acquire(blocking=True)
         
-        return dictKnownPools[Poolname]
-
-    logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
-
-    pool = poolclass(num_threads, *args, **kwargs)
-    pool.name = Poolname
-
-    dictKnownPools[Poolname] = pool
+        if Poolname is None:
+            return GetGlobalLocalMachinePool()
+        
+        if Poolname in dictKnownPools:
+            pool = dictKnownPools[Poolname]
+            assert(pool.__class__ == poolclass)
+            
+            return dictKnownPools[Poolname]
+        
+        logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
+        
+        pool = poolclass(num_threads, *args, **kwargs)
+        pool.name = Poolname
+        
+        dictKnownPools[Poolname] = pool
+    finally:
+        __pool_management_lock.release()
 
     return pool
 
@@ -142,13 +148,18 @@ def ClosePools():
     '''
     global dictKnownPools
     global profiler
+    
+    try:
+        __pool_management_lock.acquire(blocking=True)
 
-    for (key, pool) in list(dictKnownPools.items()):
-        _sprint("Waiting on pool: " + key)
-        pool.shutdown()
-        del pool 
+        for (key, pool) in list(dictKnownPools.items()):
+            _sprint("Waiting on pool: " + key)
+            pool.shutdown()
+            del pool 
 
-    dictKnownPools.clear()
+            dictKnownPools.clear()
+    finally:
+        __pool_management_lock.release()
 
  
 def GetThreadPool(Poolname=None, num_threads=None):

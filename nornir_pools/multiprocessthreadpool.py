@@ -172,9 +172,8 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
     
     #@property
     #def logger(self):
-    #    return logging.getLogger(__name__) 
-        
-        
+    #    return logging.getLogger(__name__)
+    
     def callback(self, result):
         DecrementActiveJobCount()
         PrintJobsCount()
@@ -182,7 +181,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         #self.logger.info("%s" % str(self.__str__()))
         #nornir_pools._sprint("%s" % str(self.__str__()))
     
-    def callbackontaskfail(self, task):
+    def callbackontaskfail(self, result):
         '''This is manually invoked by the task when a thread fails to complete'''
         DecrementActiveJobCount()
         PrintJobsCount()
@@ -219,7 +218,7 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
             self.callbackontaskfail(self)
             self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation
             return None
-
+        
     @property
     def iscompleted(self):
         return self.asyncresult.ready()
@@ -232,17 +231,42 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
     @property
     def tasks(self):
         if self._tasks is None:
-            self._tasks = NonDaemonPool(maxtasksperchild=None)
+            self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes)
 
         return self._tasks
 
-    def __init__(self, num_threads=None,):
+    def __init__(self, num_threads=None, maxtasksperchild=None):
         self._tasks = None
+        self._num_processes = num_threads 
+        self._maxtasksperchild = maxtasksperchild
+        
+        self._active_tasks = {} # A list of incomplete AsyncResults
 
     def shutdown(self):
-        self.wait_completion()
-        nornir_pools._remove_pool(self)
+        if hasattr(self, 'tasks'):
+            self.tasks.close()
+            self.tasks.join()
+            self.wait_completion()
+            
+            assert(len(self._active_tasks) == 0)
+            self._tasks = None
 
+        nornir_pools._remove_pool(self)
+        
+    def callback_wrapper(self, callback_func):
+        def wrapper_function(result):
+            if isinstance(result, multiprocessing.pool.AsyncResult):
+                task_id = result._nornir_task_id_
+                if not result._nornir_task_id_ in self._active_tasks:
+                    raise ValueError("Unexpected result received")
+                 
+                del self._active_tasks[task_id]
+            #else: Errors return an exception, which we can't easily trace back to a task
+            return callback_func(result)
+                
+        
+        return wrapper_function
+    
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
@@ -253,21 +277,26 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         # This hangs the caller if they wait on the task.
         
         retval_task = MultiprocessThreadTask(name, None, args, kwargs)
-        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs, callback=retval_task.callback)
+        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,
+                                                         callback=self.callback_wrapper(retval_task.callback),
+                                                         error_callback=self.callback_wrapper(retval_task.callbackontaskfail))
         if retval_task.asyncresult is None:
             raise ValueError("apply_async returned None instead of an asyncresult object")
         
+        retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
+        self._active_tasks[retval_task.task_id] = retval_task
+        #print("Added task #{0}".format(retval_task.task_id))
+        
         IncrementActiveJobCount()
-        PrintJobsCount()
+        #PrintJobsCount()
         
         return retval_task
 
     def wait_completion(self):
 
         """Wait for completion of all the tasks in the queue"""
+        while len(self._active_tasks) > 0:
+            (task_id, task) = self._active_tasks.popitem()
+            task.asyncresult.wait()
 
-        if hasattr(self, 'tasks'):
-            self.tasks.close()
-            self.tasks.join()
-            self._tasks = None
  
