@@ -89,12 +89,12 @@ class Worker(threading.Thread):
             except queue.Empty as e:
                 # Check if we should kill the thread
                 if(self.shutdown_event.isSet()):
-                    # _sprint ("Queue Empty, exiting worker thread")
+                    nornir_pools._sprint("Queue Empty, exiting worker thread")
                     self.deadthreadqueue.put(self)
                     return
                 else:
                     self.deadthreadqueue.put(self)
-                    #logger.info("Thread #%d idle shutdown" % (self.ident))
+                    nornir_pools._sprint("Thread #%d idle shutdown" % (self.ident))
                     return
                 
                 continue

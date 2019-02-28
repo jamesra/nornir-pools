@@ -78,7 +78,7 @@ class LocalThreadPoolBase(PoolBase):
          
         self.WorkerCheckInterval=kwargs.get('WorkerCheckInterval', None)
         if self.WorkerCheckInterval is None:
-            self.WorkerCheckInterval = 0.5
+            self.WorkerCheckInterval = 2
         
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
         if self._max_threads is None:
@@ -115,6 +115,7 @@ class LocalThreadPoolBase(PoolBase):
                 self._threads.append(t)
                 num_active_threads += 1
                 num_threads_created += 1
+                time.sleep(0)
                 
             else:
                 break
@@ -139,4 +140,5 @@ class LocalThreadPoolBase(PoolBase):
         """Wait for completion of all the tasks in the queue"""
 
         self.tasks.join() 
+        self.remove_finished_threads()
                 
