@@ -297,6 +297,6 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         """Wait for completion of all the tasks in the queue"""
         while len(self._active_tasks) > 0:
             (task_id, task) = self._active_tasks.popitem()
-            task.asyncresult.wait()
+            task.wait() #use wait to ensure any exceptions are thrown
 
  
