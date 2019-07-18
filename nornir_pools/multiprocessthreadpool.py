@@ -170,9 +170,9 @@ class NonDaemonPool(multiprocessing.pool.Pool):
 
 class MultiprocessThreadTask(nornir_pools.task.Task):
     
-    #@property
-    #def logger(self):
-    #    return logging.getLogger(__name__)
+    @property
+    def logger(self):
+        return logging.getLogger(__name__)
     
     def callback(self, result):
         DecrementActiveJobCount()
@@ -202,8 +202,8 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
             #self.logger.info("Multiprocess successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs)
             return retval
         else:
-            #self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            self.callbackontaskfail(self)
+            self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            #self.callbackontaskfail(self) This is called by the get() function above
             return None
 
     def wait(self):
@@ -214,9 +214,9 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         if self.asyncresult.successful():
             return
         else:
-            #self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
-            self.callbackontaskfail(self)
-            self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation
+            self.logger.error("Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs))
+            #self.callbackontaskfail(self)
+            self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation and trigger the error callback as well
             return None
         
     @property
@@ -253,18 +253,23 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
         nornir_pools._remove_pool(self)
         
-    def callback_wrapper(self, callback_func):
+    def callback_wrapper(self, task_id, callback_func):
         def wrapper_function(result):
-            if isinstance(result, multiprocessing.pool.AsyncResult):
-                task_id = result._nornir_task_id_
-                if not result._nornir_task_id_ in self._active_tasks:
-                    raise ValueError("Unexpected result received")
+            #if isinstance(retval_task, multiprocessing.pool.AsyncResult):
+            #    task_id = result._nornir_task_id_
+            #    if not result._nornir_task_id_ in self._active_tasks:
+            #        raise ValueError("Unexpected result received")
                  
-                del self._active_tasks[task_id]
+            #    del self._active_tasks[task_id]
+            if not task_id in self._active_tasks:
+                raise ValueError("Unexpected result received, task {0}".format(task_id))
+            
+            del self._active_tasks[task_id]
+            #print("Delete task {0}".format(task_id))
+            
             #else: Errors return an exception, which we can't easily trace back to a task
             return callback_func(result)
                 
-        
         return wrapper_function
     
     def add_task(self, name, func, *args, **kwargs):
@@ -278,8 +283,8 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         
         retval_task = MultiprocessThreadTask(name, None, args, kwargs)
         retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,
-                                                         callback=self.callback_wrapper(retval_task.callback),
-                                                         error_callback=self.callback_wrapper(retval_task.callbackontaskfail))
+                                                         callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
+                                                         error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
         if retval_task.asyncresult is None:
             raise ValueError("apply_async returned None instead of an asyncresult object")
         
@@ -297,6 +302,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         """Wait for completion of all the tasks in the queue"""
         while len(self._active_tasks) > 0:
             (task_id, task) = self._active_tasks.popitem()
+            self._active_tasks[task_id] = task #Re-add the item to the _active_tasks so the callback can find it and remove it as expected 
             task.wait() #use wait to ensure any exceptions are thrown
 
  

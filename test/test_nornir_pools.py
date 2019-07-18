@@ -112,10 +112,12 @@ def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsIn
     tasks = []
     for i in range(0, numThreadsInTest):
         task = TPool.add_task(str(i), Func, i)
+        task.expected_result_key = i
+        tasks.append(task)
 
     for task in tasks:
         retval = task.wait_return()
-        self.assertEqual(ExpectedResults[task.Name], retval, "Returned value from function differs from expected value")
+        self.assertEqual(ExpectedResults[task.expected_result_key], retval, "Returned value from function differs from expected value")
 
     return
 
@@ -340,10 +342,14 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
         self.assertIsNotNone(PPool)
 
         VerifyExceptionBehaviour(self, PPool)
-
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFunctionOnPool(self, PPool)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFunctionOnPool(self, PPool, Func=SquareTheNumberWithDelay)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFileIOOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
+        
         runEvenDistributionOfWorkTestOnThePool(self,PPool)
 
         VerifyExceptionBehaviour(self, PPool)
