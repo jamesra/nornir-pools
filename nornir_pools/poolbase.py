@@ -69,7 +69,7 @@ class LocalThreadPoolBase(PoolBase):
         '''
         super(LocalThreadPoolBase, self).__init__(*args, **kwargs)
         
-        self.tasks = queue.Queue()
+        
         self.deadthreadqueue = queue.Queue() #Threads put themselves here when they die
         self.shutdown_event = threading.Event()
         self.shutdown_event.clear()
@@ -83,6 +83,8 @@ class LocalThreadPoolBase(PoolBase):
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
         if self._max_threads is None:
             self._max_threads = multiprocessing.cpu_count()
+            
+        self.tasks = queue.Queue(maxsize=self._max_threads * 2)
         
     def shutdown(self):
         if self.shutdown_event.isSet():
