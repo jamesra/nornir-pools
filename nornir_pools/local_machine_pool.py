@@ -19,7 +19,7 @@ class LocalMachinePool(poolbase.PoolBase):
             if self.is_global:
                 self._mtpool = nornir_pools.GetGlobalMultithreadingPool()
             else:
-                self._mtpool = nornir_pools.GetMultithreadingPool(self.Name + " multithreading pool", self._num_threads)
+                self._mtpool = nornir_pools.GetMultithreadingPool(self.name + " multithreading pool", self._num_threads)
         
         return self._mtpool
 
@@ -29,7 +29,7 @@ class LocalMachinePool(poolbase.PoolBase):
             if self.is_global:
                 self._ppool = nornir_pools.GetGlobalProcessPool()
             else:
-                self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)
+                self._ppool = nornir_pools.GetProcessPool(self.name + " process pool", self._num_threads)
             
         return self._ppool
 
