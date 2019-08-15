@@ -132,6 +132,7 @@ class LocalThreadPoolBase(PoolBase):
                     for i in range(len(self._threads)-1, 0,-1):
                         if t == self._threads[i]:
                             del self._threads[i]
+                            break
             except queue.Empty as e:
                 return 
                         
