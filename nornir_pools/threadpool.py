@@ -78,7 +78,21 @@ class Worker(threading.Thread):
         # self.logger = logging.getLogger(__name__)
         self.start()
         
+    @staticmethod
+    def generate_elapsed_time_str(task_name, t_delta):
+        '''Generate a string describing how long a task took to complete'''
+        time_position = 70
 
+        seconds = math.fmod(t_delta, 60)
+        seconds_str = "%02.5g" % seconds
+        time_str = str(time.strftime('%H:%M:', time.gmtime(t_delta))) + seconds_str
+        
+        out_string = "--- {0}".format(task_name)
+        out_string += " " * (time_position - len(out_string))
+        out_string += time_str
+        
+        return out_string
+        
     def run(self):
         
         while True:
@@ -101,7 +115,7 @@ class Worker(threading.Thread):
                 
             # Record start time so we get a sense of performance
 
-            task_start_time = time.time()
+            #task_start_time = time.time()
 
             # print notification
 
@@ -131,40 +145,30 @@ class Worker(threading.Thread):
                 # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
                 entry.exception = e
-                error_message = "\n*** {0}\n{1}\n".format(entry.name, traceback.format_exc())
+                # error_message = "\n*** {0}\n{1}\n".format(entry.name, traceback.format_exc())
                 # self.logger.error(error_message)
                 # sys.stderr.write(error_message)
                 pass
 
             # calculate finishing time and mark task as completed
 
-            task_end_time = time.time()
-            t_delta = task_end_time - task_start_time
-
-             # generate the time elapsed string for output
-
-            seconds = math.fmod(t_delta, 60)
-            seconds_str = "%02.5g" % seconds
-            time_str = str(time.strftime('%H:%M:', time.gmtime(t_delta))) + seconds_str
+            #task_end_time = time.time()
 
             # mark the object event as completed
             entry.completed.set()
 
             # print the completion notice with times aligned
-
-            time_position = 70
-            out_string = "--- {0}".format(entry.name)
-            out_string += " " * (time_position - len(out_string))
-            out_string += time_str
-
-            # self.logger.info(out_string)
-
-            JobsQueued = self.tasks.qsize()
-            if JobsQueued > 0:
-
-                JobQText = "Jobs Queued: " + str(self.tasks.qsize())
-                JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-                nornir_pools._PrintProgressUpdate(JobQText)
+            #t_delta = task_end_time - task_start_time
+            #out_string = generate_elapsed_time_str(entry.name, t_delta)
+            #self.logger.info(out_string)
+# #########
+#             JobsQueued = self.tasks.qsize()
+#             if JobsQueued > 0:
+# 
+#                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
+#                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
+#                 nornir_pools._PrintProgressUpdate(JobQText)
+###########
 
             self.tasks.task_done()
 
@@ -176,12 +180,12 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
     """Pool of threads consuming tasks from a queue"""
     #How often workers check for new jobs in the queue
 
-    def __init__(self, num_threads=None,  WorkerCheckInterval = None):
+    def __init__(self, num_threads=None,  WorkerCheckInterval = None, *args, **kwargs):
         '''
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
-        super(Thread_Pool, self).__init__(num_threads=num_threads,  WorkerCheckInterval=WorkerCheckInterval)
+        super(Thread_Pool, self).__init__(num_threads=num_threads,  WorkerCheckInterval=WorkerCheckInterval, *args, **kwargs)
 
         self._next_thread_id = 0
 

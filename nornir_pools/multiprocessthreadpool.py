@@ -14,11 +14,13 @@ import nornir_pools.task
 import nornir_pools
 
 import cProfile
-import os
+import os 
+import time
 
 #from threading import Lock
 
 _profiler = None
+
  
 def _poolinit(profile_dir=None):
     
@@ -42,35 +44,7 @@ def _processfinalizer(profile_dir):
         profile_fullpath = os.path.join(profile_dir, profile_filename)
         _profiler.dump_stats(profile_fullpath)
         _profiler = None
-      
-
-#JobCountLock = Lock()
-ActiveJobCount = 0
-
-def IncrementActiveJobCount():
-    #global JobCountLock
-    global ActiveJobCount
-    #JobCountLock.acquire(True)
-    ActiveJobCount += 1
-    #JobCountLock.release()
-
-
-def DecrementActiveJobCount():
-    #global JobCountLock
-    global ActiveJobCount
-    #JobCountLock.acquire(True)
-    ActiveJobCount -= 1
-    #JobCountLock.release()
-
-
-def PrintJobsCount():
-    global ActiveJobCount
-    JobQText = "Jobs Queued: " + str(ActiveJobCount)
-    JobQText = ('\b' * 40) + JobQText + ('.' * (40 - len(JobQText)))
-    nornir_pools._PrintProgressUpdate (JobQText)
-
-# import nornir_pools
-
+  
 # 
 # def _pickle_method(method):
 #     func_name = method.__func__.__name__
@@ -164,8 +138,8 @@ class NonDaemonPool(multiprocessing.pool.Pool):
                         
         super(NonDaemonPool, self).__init__(*args, **kwargs) 
         
-    def Process(self, *args, **kwds):
-        return NoDaemonProcess(*args, **kwds)
+    #def Process(self, *args, **kwds):
+    #    return NoDaemonProcess(*args, **kwds)
 
 
 class MultiprocessThreadTask(nornir_pools.task.Task):
@@ -175,16 +149,17 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         return logging.getLogger(__name__)
     
     def callback(self, result):
-        DecrementActiveJobCount()
-        PrintJobsCount()
+        pass
+        #DecrementActiveJobCount()
+        #PrintJobsCount()
         self.set_completion_time()
         #self.logger.info("%s" % str(self.__str__()))
         #nornir_pools._sprint("%s" % str(self.__str__()))
     
     def callbackontaskfail(self, result):
         '''This is manually invoked by the task when a thread fails to complete'''
-        DecrementActiveJobCount()
-        PrintJobsCount()
+        #DecrementActiveJobCount()
+        #PrintJobsCount()
         self.set_completion_time()
 
     def __init__(self, name, asyncresult, *args, **kwargs):
@@ -234,13 +209,19 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
             self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes)
 
         return self._tasks
+    
+    @property
+    def num_active_tasks(self):
+        return len(self._active_tasks)
 
-    def __init__(self, num_threads=None, maxtasksperchild=None):
+    def __init__(self, num_threads=None, maxtasksperchild=None, *args, **kwargs):
         self._tasks = None
         self._num_processes = num_threads 
         self._maxtasksperchild = maxtasksperchild
-        
         self._active_tasks = {} # A list of incomplete AsyncResults
+        
+        super(MultiprocessThread_Pool, self).__init__(*args, **kwargs)
+    
 
     def shutdown(self):
         if hasattr(self, 'tasks'):
@@ -267,7 +248,9 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
             del self._active_tasks[task_id]
             #print("Delete task {0}".format(task_id))
             
+            
             #else: Errors return an exception, which we can't easily trace back to a task
+            self.TryReportActiveTaskCount()
             return callback_func(result)
                 
         return wrapper_function
@@ -282,7 +265,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         # This hangs the caller if they wait on the task.
         
         retval_task = MultiprocessThreadTask(name, None, args, kwargs)
-        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,
+        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs, 
                                                          callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
                                                          error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
         if retval_task.asyncresult is None:
@@ -292,10 +275,58 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         self._active_tasks[retval_task.task_id] = retval_task
         #print("Added task #{0}".format(retval_task.task_id))
         
-        IncrementActiveJobCount()
+        self.TryReportActiveTaskCount()
+        
+        return retval_task
+    
+    def starmap(self, name, func, iterable, chunksize=None):
+
+        """Add a task to the queue"""
+
+        
+        # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
+        # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
+        # This hangs the caller if they wait on the task.
+        
+        retval_task = MultiprocessThreadTask(name, None)
+        retval_task.asyncresult = self.tasks.starmap(func, iterable, chunksize=chunksize,
+                                                         callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
+                                                         error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
+        if retval_task.asyncresult is None:
+            raise ValueError("starmap_async returned None instead of an asyncresult object")
+        
+        retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
+        self._active_tasks[retval_task.task_id] = retval_task
+        #print("Added task #{0}".format(retval_task.task_id))
+        
+        return retval_task
+    
+    
+    def starmap_async(self, name, func, iterable, chunksize=None):
+
+        """Add a task to the queue"""
+
+        
+        # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
+        # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
+        # This hangs the caller if they wait on the task.
+        
+        retval_task = MultiprocessThreadTask(name, None)
+        retval_task.asyncresult = self.tasks.starmap_async(func, iterable, chunksize=chunksize,
+                                                         callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
+                                                         error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
+        if retval_task.asyncresult is None:
+            raise ValueError("starmap_async returned None instead of an asyncresult object")
+        
+        retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
+        self._active_tasks[retval_task.task_id] = retval_task
+        #print("Added task #{0}".format(retval_task.task_id))
+        
+        #IncrementActiveJobCount()
         #PrintJobsCount()
         
         return retval_task
+    
 
     def wait_completion(self):
 
