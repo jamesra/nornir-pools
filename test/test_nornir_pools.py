@@ -78,7 +78,8 @@ def VerifyExceptionBehaviour(test, pool):
         pass
 
     test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread")
-
+    ExceptionFound = False
+    
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait()
@@ -88,6 +89,17 @@ def VerifyExceptionBehaviour(test, pool):
         pass
 
     test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
+    ExceptionFound = False
+    
+    try:
+        task = pool.add_task(exceptText, RaiseException, exceptText)
+        pool.wait_completion()
+    except IntentionalPoolException as e:
+        print("Correctly found exception in thread\n" + str(e))
+        ExceptionFound = True
+        pass
+
+    test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread and pool.wait_completion called")
 
 
 def SquareTheNumberWithDelay(num):
@@ -253,7 +265,7 @@ class TestThreadPool(TestThreadPoolBase):
 
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
-        runFileIOOnPool(self, TPool) 
+        runFileIOOnPool(self, TPool)
 
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
