@@ -139,7 +139,7 @@ class LocalThreadPoolBase(PoolBase):
         if num_active_threads == self._max_threads:
             return 
         
-        num_threads_needed = min(self._max_threads, self.tasks.qsize()) - num_active_threads
+        num_threads_needed = min(self._max_threads, self.tasks.qsize()+1) - num_active_threads
         
         num_threads_created = 0
         #while num_active_threads < min((self._max_threads, self.tasks.qsize()+1)):
