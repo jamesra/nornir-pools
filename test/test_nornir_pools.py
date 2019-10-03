@@ -78,7 +78,8 @@ def VerifyExceptionBehaviour(test, pool):
         pass
 
     test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread")
-
+    ExceptionFound = False
+    
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait()
@@ -88,6 +89,17 @@ def VerifyExceptionBehaviour(test, pool):
         pass
 
     test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
+    ExceptionFound = False
+    
+    try:
+        task = pool.add_task(exceptText, RaiseException, exceptText)
+        pool.wait_completion()
+    except IntentionalPoolException as e:
+        print("Correctly found exception in thread\n" + str(e))
+        ExceptionFound = True
+        pass
+
+    test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread and pool.wait_completion called")
 
 
 def SquareTheNumberWithDelay(num):
@@ -112,10 +124,12 @@ def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsIn
     tasks = []
     for i in range(0, numThreadsInTest):
         task = TPool.add_task(str(i), Func, i)
+        task.expected_result_key = i
+        tasks.append(task)
 
     for task in tasks:
         retval = task.wait_return()
-        self.assertEqual(ExpectedResults[task.Name], retval, "Returned value from function differs from expected value")
+        self.assertEqual(ExpectedResults[task.expected_result_key], retval, "Returned value from function differs from expected value")
 
     return
 
@@ -251,7 +265,7 @@ class TestThreadPool(TestThreadPoolBase):
 
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
-        runFileIOOnPool(self, TPool) 
+        runFileIOOnPool(self, TPool)
 
 
 class TestMultiprocessThreadPool(TestThreadPoolBase):
@@ -340,10 +354,14 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
         self.assertIsNotNone(PPool)
 
         VerifyExceptionBehaviour(self, PPool)
-
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFunctionOnPool(self, PPool)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFunctionOnPool(self, PPool, Func=SquareTheNumberWithDelay)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFileIOOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
+        self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
+        
         runEvenDistributionOfWorkTestOnThePool(self,PPool)
 
         VerifyExceptionBehaviour(self, PPool)

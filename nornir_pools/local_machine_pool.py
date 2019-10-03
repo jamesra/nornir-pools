@@ -11,6 +11,17 @@ class LocalMachinePool(poolbase.PoolBase):
     '''
     Unified interface for the process and multithreading pools allowing both threads and processes to be launched from the same pool.
     '''
+    
+    @property
+    def num_active_tasks(self):
+        total = 0
+        if self._mtpool is not None:
+            total += self._mtpool.num_active_tasks
+        
+        if self._ppool is not None:
+            total += self._ppool.num_active_tasks
+            
+        return total
 
     @property
     def _multithreading_pool(self):
@@ -19,7 +30,7 @@ class LocalMachinePool(poolbase.PoolBase):
             if self.is_global:
                 self._mtpool = nornir_pools.GetGlobalMultithreadingPool()
             else:
-                self._mtpool = nornir_pools.GetMultithreadingPool(self.Name + " multithreading pool", self._num_threads)
+                self._mtpool = nornir_pools.GetMultithreadingPool(self.name + " multithreading pool", self._num_threads)
         
         return self._mtpool
 
@@ -29,14 +40,14 @@ class LocalMachinePool(poolbase.PoolBase):
             if self.is_global:
                 self._ppool = nornir_pools.GetGlobalProcessPool()
             else:
-                self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)
+                self._ppool = nornir_pools.GetProcessPool(self.name + " process pool", self._num_threads)
             
         return self._ppool
 
     def get_active_nodes(self):
         return ["localhost"]
 
-    def __init__(self, num_threads, is_global = False):
+    def __init__(self, num_threads, is_global = False, *args, **kwargs):
         '''
         Constructor
         '''
@@ -46,6 +57,8 @@ class LocalMachinePool(poolbase.PoolBase):
         self.is_global = is_global
         self._mtpool = None
         self._ppool = None
+        
+        super(LocalMachinePool, self).__init__(*args, **kwargs)
 
 
     def add_task(self, name, func, *args, **kwargs):
@@ -59,11 +72,17 @@ class LocalMachinePool(poolbase.PoolBase):
         """Wait for completion of all the tasks in the queue"""
         if not self._mtpool is None:
             self._mtpool.wait_completion()
-            self._mtpool = None
 
         if not self._ppool is None:
-            self._ppool.wait_completion()
-            self._ppool = None
+            self._ppool.wait_completion() 
 
     def shutdown(self):
         self.wait_completion()
+        
+        if not self._mtpool is None:
+            self._mtpool.shutdown()
+            self._mtpool = None
+
+        if not self._ppool is None:
+            self._ppool.shutdown()
+            self._ppool = None 

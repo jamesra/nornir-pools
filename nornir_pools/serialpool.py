@@ -24,8 +24,12 @@ class SerialPool(poolbase.PoolBase):
 
     def get_active_nodes(self):
         return ["localhost"]
+    
+    @property
+    def num_active_tasks(self):
+        raise 1
 
-    def __init__(self, num_threads):
+    def __init__(self, num_threads, *args, **kwargs):
         '''
         Constructor
         '''
@@ -33,6 +37,7 @@ class SerialPool(poolbase.PoolBase):
         self._num_threads = num_threads 
         self._ppool = None
         # self._name = pool_name
+        super(SerialPool, self).__init__(*args, **kwargs)
  
 
     def add_task(self, name, func, *args, **kwargs):

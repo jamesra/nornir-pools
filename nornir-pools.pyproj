@@ -1,0 +1,133 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{5dc0b342-648c-4512-a74c-1141083c728c}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>test\test_nornir_pools.py</StartupFile>
+    <SearchPath>nornir_pools\</SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <IsWindowsApplication>False</IsWindowsApplication>
+    <InterpreterId>{9a7a9026-48c1-4688-9d5d-e5699d47d074}</InterpreterId>
+    <InterpreterVersion>3.4</InterpreterVersion>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <CommandLineArguments />
+    <InterpreterPath />
+    <InterpreterArguments />
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <ItemGroup>
+    <Compile Include="ez_setup.py" />
+    <Compile Include="setup.py" />
+    <Compile Include="nornir_pools\multiprocessthreadpool.py" />
+    <Compile Include="nornir_pools\parallelpythonpool.py" />
+    <Compile Include="nornir_pools\poolbase.py" />
+    <Compile Include="nornir_pools\processpool.py" />
+    <Compile Include="nornir_pools\task.py" />
+    <Compile Include="nornir_pools\threadpool.py" />
+    <Compile Include="nornir_pools\__init__.py" />
+    <Compile Include="test\test_nornir_pools.py" />
+    <Compile Include="test\__init__.py" />
+    <Content Include="build\html\genindex.html" />
+    <Content Include="build\html\index.html" />
+    <Content Include="build\html\search.html" />
+    <Content Include="build\html\searchindex.js" />
+    <Content Include="build\html\_sources\index.txt" />
+    <Content Include="build\html\_static\basic.css" />
+    <Content Include="build\html\_static\default.css" />
+    <Content Include="build\html\_static\pygments.css" />
+    <Content Include="build\html\_static\doctools.js" />
+    <Content Include="build\html\_static\jquery.js" />
+    <Content Include="build\html\_static\searchtools.js" />
+    <Content Include="build\html\_static\sidebar.js" />
+    <Content Include="build\html\_static\underscore.js" />
+    <Content Include="build\html\_static\websupport.js" />
+    <Content Include="build\html\_static\comment-bright.png" />
+    <Content Include="build\html\_static\comment-close.png" />
+    <Content Include="build\html\_static\comment.png" />
+    <Content Include="build\html\_static\down-pressed.png" />
+    <Content Include="build\html\_static\down.png" />
+    <Content Include="build\html\_static\file.png" />
+    <Content Include="build\html\_static\minus.png" />
+    <Content Include="build\html\_static\plus.png" />
+    <Content Include="build\html\_static\up-pressed.png" />
+    <Content Include="build\html\_static\up.png" />
+    <Content Include="build\html\_static\ajax-loader.gif" />
+    <Compile Include="build\lib\nornir_pools\multiprocessthreadpool.py" />
+    <Compile Include="build\lib\nornir_pools\parallelpythonpool.py" />
+    <Compile Include="build\lib\nornir_pools\poolbase.py" />
+    <Compile Include="build\lib\nornir_pools\processpool.py" />
+    <Compile Include="build\lib\nornir_pools\task.py" />
+    <Compile Include="build\lib\nornir_pools\threadpool.py" />
+    <Compile Include="build\lib\nornir_pools\__init__.py" />
+    <Compile Include="docs\source\conf.py" />
+    <Content Include="docs\build\html\api.html" />
+    <Content Include="docs\build\html\examples.html" />
+    <Content Include="docs\build\html\genindex.html" />
+    <Content Include="docs\build\html\index.html" />
+    <Content Include="docs\build\html\py-modindex.html" />
+    <Content Include="docs\build\html\search.html" />
+    <Content Include="docs\build\html\searchindex.js" />
+    <Content Include="docs\build\html\_modules\index.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools.html" />
+    <Content Include="docs\build\html\_sources\api.txt" />
+    <Content Include="docs\build\html\_sources\examples.txt" />
+    <Content Include="docs\build\html\_sources\index.txt" />
+    <Content Include="docs\build\html\_static\basic.css" />
+    <Content Include="docs\build\html\_static\default.css" />
+    <Content Include="docs\build\html\_static\pygments.css" />
+    <Content Include="docs\build\html\_static\doctools.js" />
+    <Content Include="docs\build\html\_static\jquery.js" />
+    <Content Include="docs\build\html\_static\searchtools.js" />
+    <Content Include="docs\build\html\_static\sidebar.js" />
+    <Content Include="docs\build\html\_static\underscore.js" />
+    <Content Include="docs\build\html\_static\websupport.js" />
+    <Content Include="docs\build\html\_static\comment-bright.png" />
+    <Content Include="docs\build\html\_static\comment-close.png" />
+    <Content Include="docs\build\html\_static\comment.png" />
+    <Content Include="docs\build\html\_static\down-pressed.png" />
+    <Content Include="docs\build\html\_static\down.png" />
+    <Content Include="docs\build\html\_static\file.png" />
+    <Content Include="docs\build\html\_static\minus.png" />
+    <Content Include="docs\build\html\_static\plus.png" />
+    <Content Include="docs\build\html\_static\up-pressed.png" />
+    <Content Include="docs\build\html\_static\up.png" />
+    <Content Include="docs\build\html\_static\ajax-loader.gif" />
+    <Content Include="docs\build\html\_modules\nornir_pools\multiprocessthreadpool.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\parallelpythonpool.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\poolbase.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\pool.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\processpool.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\task.html" />
+    <Content Include="docs\build\html\_modules\nornir_pools\threadpool.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="build\" />
+    <Folder Include="build\html" />
+    <Folder Include="build\html\_sources" />
+    <Folder Include="build\html\_static" />
+    <Folder Include="build\lib\" />
+    <Folder Include="build\lib\nornir_pools" />
+    <Folder Include="docs\" />
+    <Folder Include="docs\build\" />
+    <Folder Include="docs\build\html" />
+    <Folder Include="docs\build\html\_modules" />
+    <Folder Include="docs\build\html\_modules\nornir_pools" />
+    <Folder Include="docs\build\html\_sources" />
+    <Folder Include="docs\build\html\_static" />
+    <Folder Include="docs\source" />
+    <Folder Include="nornir_pools" />
+    <Folder Include="test" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="{9a7a9026-48c1-4688-9d5d-e5699d47d074}\2.7" />
+    <InterpreterReference Include="{9a7a9026-48c1-4688-9d5d-e5699d47d074}\3.4" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+</Project>

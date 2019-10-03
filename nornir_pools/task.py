@@ -9,6 +9,18 @@ class Task(object):
     Task objects are created by adding tasks or processes to the pools.  They are not intended to be created directly by callers.
     '''
     
+    _NextID = 0
+     
+    @property
+    def task_id(self):
+        return self.__task_id__
+    
+    @classmethod
+    def GenerateID(cls):
+        _id = cls._NextID
+        cls._NextID = cls._NextID + 1
+        return _id
+    
     @property
     def elapsed_time(self):
         endtime = self.task_end_time
@@ -29,6 +41,7 @@ class Task(object):
         '''
         :param str name: friendly name of the task. Does not need to be unique
         '''
+        self.__task_id__ = Task.GenerateID()
         self.args = args
         self.kwargs = kwargs
         self.name = name  # name of the task, used for debugging
@@ -75,6 +88,15 @@ class Task(object):
         :rtype: bool
         '''
         raise NotImplementedError()
+    
+    def __eq__(self, other):
+        if not isinstance(other, Task):
+            return False
+        
+        return self.__task_id__ == other.__task_id__
+      
+    def __hash__(self):
+        return self.__task_id__
 
 
 class TaskWithEvent(Task):
@@ -86,7 +108,6 @@ class TaskWithEvent(Task):
         super(TaskWithEvent, self).__init__(name, *args, **kwargs)
         self.completed = threading.Event()  # The event that task creators can look at to know if the task completes
         self.returncode = 0
-        
 
     @property
     def iscompleted(self):
