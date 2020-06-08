@@ -243,7 +243,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
                  
             #    del self._active_tasks[task_id]
             if not task_id in self._active_tasks:
-                raise ValueError("Unexpected result received, task {0}".format(task_id))
+                raise ValueError("Task {0} not listed in active tasks, but a result was received in pool {1}...".format(task_id, str(self)))
             
             del self._active_tasks[task_id]
             #print("Delete task {0}".format(task_id))
@@ -278,55 +278,52 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
         self.TryReportActiveTaskCount()
         
         return retval_task
-    
-    def starmap(self, name, func, iterable, chunksize=None):
-
-        """Add a task to the queue"""
-
-        
-        # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
-        # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
-        # This hangs the caller if they wait on the task.
-        
-        retval_task = MultiprocessThreadTask(name, None)
-        retval_task.asyncresult = self.tasks.starmap(func, iterable, chunksize=chunksize,
-                                                         callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
-                                                         error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
-        if retval_task.asyncresult is None:
-            raise ValueError("starmap_async returned None instead of an asyncresult object")
-        
-        retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
-        self._active_tasks[retval_task.task_id] = retval_task
-        #print("Added task #{0}".format(retval_task.task_id))
-        
-        return retval_task
-    
-    
-    def starmap_async(self, name, func, iterable, chunksize=None):
-
-        """Add a task to the queue"""
-
-        
-        # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
-        # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
-        # This hangs the caller if they wait on the task.
-        
-        retval_task = MultiprocessThreadTask(name, None)
-        retval_task.asyncresult = self.tasks.starmap_async(func, iterable, chunksize=chunksize,
-                                                         callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
-                                                         error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
-        if retval_task.asyncresult is None:
-            raise ValueError("starmap_async returned None instead of an asyncresult object")
-        
-        retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
-        self._active_tasks[retval_task.task_id] = retval_task
-        #print("Added task #{0}".format(retval_task.task_id))
-        
-        #IncrementActiveJobCount()
-        #PrintJobsCount()
-        
-        return retval_task
-    
+#     
+#     def starmap(self, name, func, iterable, chunksize=None):
+# 
+#         """Add a task to the queue"""
+# 
+#         
+#         # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
+#         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
+#         # This hangs the caller if they wait on the task.
+#         
+#         retval_task = MultiprocessThreadTask(name, None)
+#         retval_task.asyncresult = self.tasks.starmap(func, iterable, chunksize=chunksize,
+#                                                          callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
+#                                                          error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
+#         if retval_task.asyncresult is None:
+#             raise ValueError("starmap_async returned None instead of an asyncresult object")
+#         
+#         retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
+#         self._active_tasks[retval_task.task_id] = retval_task
+#         #print("Added task #{0}".format(retval_task.task_id))
+#         
+#         return retval_task
+#     
+#     
+#     def starmap_async(self, name, func, iterable, chunksize=None):
+# 
+#         """Add a task to the queue"""
+# 
+#         
+#         # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
+#         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
+#         # This hangs the caller if they wait on the task.
+#         
+#         retval_task = MultiprocessThreadTask(name, None)
+#         retval_task.asyncresult = self.tasks.starmap_async(func, iterable, chunksize=chunksize,
+#                                                          callback=self.callback_wrapper(retval_task.task_id, retval_task.callback),
+#                                                          error_callback=self.callback_wrapper(retval_task.task_id, retval_task.callbackontaskfail))
+#         if retval_task.asyncresult is None:
+#             raise ValueError("starmap_async returned None instead of an asyncresult object")
+#         
+#         retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
+#         self._active_tasks[retval_task.task_id] = retval_task
+#         #print("Added task #{0}".format(retval_task.task_id))
+#         
+#         return retval_task
+#     
 
     def wait_completion(self):
 
