@@ -21,6 +21,16 @@ class PoolBase(object):
     @property
     def num_active_tasks(self):
         raise NotImplementedError()
+    
+    @property
+    def logger(self):
+        if self._logger is None:
+            self._logger = logging.getLogger(__name__)
+        
+        return self._logger
+    
+    def __str__(self):
+        return "Pool {0} with {1} active tasks".format(self.name, self.num_active_tasks)
 
     def shutdown(self):
         '''
@@ -35,7 +45,8 @@ class PoolBase(object):
         raise NotImplementedError()
 
     def __init__(self, *args, **kwargs):
-        self.logger = logging.getLogger(__name__)
+        #self.logger = logging.getLogger(__name__)
+        self._logger = None
         self._name = kwargs.get('name', None)
         self._last_job_report_time = time.time()
         self.job_report_interval_in_seconds = kwargs.get("job_report_interval", 10.0)
