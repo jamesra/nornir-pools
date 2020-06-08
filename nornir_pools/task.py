@@ -10,6 +10,7 @@ class Task(object):
     '''
     
     _NextID = 0
+    _IDLock = threading.Lock()
      
     @property
     def task_id(self):
@@ -17,9 +18,10 @@ class Task(object):
     
     @classmethod
     def GenerateID(cls):
-        _id = cls._NextID
-        cls._NextID = cls._NextID + 1
-        return _id
+        with cls._IDLock:
+            _id = cls._NextID
+            cls._NextID = cls._NextID + 1
+            return _id
     
     @property
     def elapsed_time(self):
