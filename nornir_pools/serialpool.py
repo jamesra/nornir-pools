@@ -27,7 +27,7 @@ class SerialPool(poolbase.PoolBase):
     
     @property
     def num_active_tasks(self):
-        raise 1
+        return 1
 
     def __init__(self, num_threads, *args, **kwargs):
         '''
