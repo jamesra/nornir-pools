@@ -16,7 +16,7 @@ import nornir_pools
 from . import poolbase
 
 from . import task
-
+from nornir_shared import prettyoutput
 
 
 class ImmediateProcessTask(task.TaskWithEvent):
@@ -214,7 +214,12 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
 
     def add_process(self, name, func, *args, **kwargs):
         """Add a task to the queue, args are passed directly to subprocess.Popen"""
-
+        if func is None:
+            prettyoutput.LogErr("Process pool add task {0} called with 'None' as function".format(name))
+        if callable(func) == False:
+            prettyoutput.LogErr("Process pool add task {0} parameter was non-callable value {1} when it should be passed a function".format(name, func))
+            
+        assert(callable(func))
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed

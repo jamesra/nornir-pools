@@ -16,6 +16,7 @@ import nornir_pools
 import cProfile
 import os 
 import time
+from nornir_shared import prettyoutput
 
 #from threading import Lock
 
@@ -258,7 +259,12 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
     def add_task(self, name, func, *args, **kwargs):
 
         """Add a task to the queue"""
-
+        if func is None:
+            prettyoutput.LogErr("Multiprocess pool add task {0} called with 'None' as function".format(name))
+        if callable(func) == False:
+            prettyoutput.LogErr("Multiprocess pool add task {0} parameter was non-callable value {1} when it should be passed a function".format(name, func))
+            
+        assert(callable(func))
         
         # I've seen an issue here were apply_async prints an exception about not being able to import a module.  It then swallows the exception.
         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
