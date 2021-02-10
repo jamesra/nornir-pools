@@ -101,9 +101,7 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
 
     global dictKnownPools
     
-    try:
-        __pool_management_lock.acquire(blocking=True)
-        
+    with __pool_management_lock:
         if Poolname is None:
             return GetGlobalLocalMachinePool()
         
@@ -119,26 +117,32 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
         pool.name = Poolname
         
         dictKnownPools[Poolname] = pool
-    finally:
-        __pool_management_lock.release()
 
-    return pool
+        return pool
 
 
 def WaitOnAllPools():
     global dictKnownPools
-    for (key, pool) in list(dictKnownPools.items()):
-        _sprint("Waiting on pool: " + key)
+    
+    pool_items = None
+    with __pool_management_lock:
+        pool_items = list(dictKnownPools.items())
+        
+    for (key, pool) in pool_items:
+        _sprint("Waiting on pool: " + str(pool))
         pool.wait_completion()
 
 def _remove_pool(p):
     '''Called from pool shutdown implementations to remove the pool from the map of existing pools'''
+    global dictKnownPools
+    
     pname = p
     if not isinstance(p, str):
         pname = p.name 
         
-    if pname in dictKnownPools:
-        del dictKnownPools[pname]
+    with __pool_management_lock:
+        if pname in dictKnownPools:
+            del dictKnownPools[pname]
 
 @atexit.register
 def ClosePools():
@@ -149,17 +153,30 @@ def ClosePools():
     global dictKnownPools
     global profiler
     
-    try:
-        __pool_management_lock.acquire(blocking=True)
-
-        for (key, pool) in list(dictKnownPools.items()):
-            _sprint("Waiting on pool: " + key)
+    with __pool_management_lock:
+        pool_items = list(dictKnownPools.items())
+    
+    while len(pool_items) > 0:
+        for (key, pool) in pool_items:
+            _sprint("Waiting on pool: {0}".format(str(pool)))
+            pool = None
+            with __pool_management_lock:
+                if key in dictKnownPools:
+                    pool = dictKnownPools[key]
+                else:
+                    _sprint("pool {0} no longer in known pool list.  Moving on.".format(str(pool)))
+            
+            if pool is None:
+                continue
+            
             pool.shutdown()
-            del pool 
-
-            dictKnownPools.clear()
-    finally:
-        __pool_management_lock.release()
+            
+            with __pool_management_lock:
+                if key in dictKnownPools:
+                    del dictKnownPools[key]
+                    
+        with __pool_management_lock:
+            pool_items = list(dictKnownPools.items())
 
  
 def GetThreadPool(Poolname=None, num_threads=None):

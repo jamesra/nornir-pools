@@ -15,6 +15,7 @@ import nornir_pools.task as task
 
 import nornir_pools
 import nornir_pools.poolbase as poolbase
+from nornir_shared import prettyoutput
 
 
 class ThreadTask(task.TaskWithEvent):
@@ -202,6 +203,12 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
 
     def add_task(self, name, func, *args, **kwargs):
 
+        if func is None:
+            prettyoutput.LogErr("Thread pool add task {0} called with 'None' as function".format(name))
+        if callable(func) == False:
+            prettyoutput.LogErr("Thread pool add task {0} parameter was non-callable value {1} when it should be passed a function".format(name, func))
+            
+        assert(callable(func))
         """Add a task to the queue"""
         assert(False == self.shutdown_event.isSet())
         
