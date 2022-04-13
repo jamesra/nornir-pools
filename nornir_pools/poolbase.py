@@ -184,8 +184,12 @@ class LocalThreadPoolBase(PoolBase):
                  
 
     def wait_completion(self):
-        """Wait for completion of all the tasks in the queue"""
+        """Wait for completion of all the tasks in the queue.
+           Note that wait or wait_return must be called on 
+           each task to detect exceptions if there were any
+           """
 
-        self.tasks.join() 
+        
+        self.tasks.join()
         self.remove_finished_threads()
                 

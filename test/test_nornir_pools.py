@@ -94,12 +94,14 @@ def VerifyExceptionBehaviour(test, pool):
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         pool.wait_completion()
+        
+        task.wait();
     except IntentionalPoolException as e:
         print("Correctly found exception in thread\n" + str(e))
         ExceptionFound = True
         pass
 
-    test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread and pool.wait_completion called")
+    test.assertTrue(ExceptionFound, "wait_completion: No exception reported when raised in thread and pool.wait_completion called")
 
 
 def SquareTheNumberWithDelay(num):
