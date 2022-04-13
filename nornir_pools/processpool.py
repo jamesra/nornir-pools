@@ -214,24 +214,30 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
 
     def add_process(self, name, func, *args, **kwargs):
         """Add a task to the queue, args are passed directly to subprocess.Popen"""
-        if func is None:
+        if isinstance(func, str):
+            pass
+        elif func is None:
             prettyoutput.LogErr("Process pool add task {0} called with 'None' as function".format(name))
-        if callable(func) == False:
+        elif callable(func) == False:
             prettyoutput.LogErr("Process pool add task {0} parameter was non-callable value {1} when it should be passed a function".format(name, func))
             
-        assert(callable(func))
+        assert(isinstance(func, str) or callable(func))
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
- 
+        
         if isinstance(kwargs, dict):
             if not 'shell' in kwargs:
                 kwargs['shell'] = True
         else:
             kwargs = {}
             kwargs['shell'] = True
-
-        entry = ProcessTask(name, func, *args, **kwargs)
+            
+        if func is str:
+            entry = ImmediateProcessTask(name, func, *args, **kwargs)
+        else:
+            entry = ProcessTask(name, func, *args, **kwargs)
+            
         self.tasks.put(entry)
         self.add_threads_if_needed()
 
