@@ -217,6 +217,14 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
 
     def __init__(self, num_threads=None, maxtasksperchild=None, *args, **kwargs):
         self._tasks = None
+        
+        if 'MAX_PYTHON_THREADS' in os.environ and num_threads is not None:
+            environ_max_threads = int(os.environ['MAX_PYTHON_THREADS'])
+            if environ_max_threads > num_threads:
+                prettyoutput.Log("Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={0} threads))".format(num_threads))
+                
+            num_threads=min(environ_max_threads, num_threads)
+            
         self._num_processes = num_threads 
         self._maxtasksperchild = maxtasksperchild
         self._active_tasks = {} # A list of incomplete AsyncResults
