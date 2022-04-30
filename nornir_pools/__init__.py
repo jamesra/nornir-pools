@@ -111,7 +111,7 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
             
             return dictKnownPools[Poolname]
         
-        logging.warn("Creating %s pool of type %s" % (Poolname, poolclass))
+        logging.info(f"Creating {Poolname} pool of type {poolclass}")
         
         pool = poolclass(num_threads, *args, **kwargs)
         pool.name = Poolname
@@ -129,7 +129,9 @@ def WaitOnAllPools():
         pool_items = list(dictKnownPools.items())
         
     for (key, pool) in pool_items:
-        _sprint("Waiting on pool: " + str(pool))
+        if pool.num_active_tasks > 0:
+            _sprint("Waiting on pool: " + str(pool))
+            
         pool.wait_completion()
 
 def _remove_pool(p):
@@ -158,7 +160,9 @@ def ClosePools():
     
     while len(pool_items) > 0:
         for (key, pool) in pool_items:
-            _sprint("Waiting on pool: {0}".format(str(pool)))
+            if pool.num_active_tasks > 0:
+                _sprint("Waiting on pool: {0}".format(str(pool)))
+                
             pool = None
             with __pool_management_lock:
                 if key in dictKnownPools:
