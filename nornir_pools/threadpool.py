@@ -9,6 +9,7 @@ import threading
 import time
 import traceback
 import queue
+import os
 #import logging
 
 import nornir_pools.task as task
@@ -186,6 +187,22 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
+        
+        if 'MAX_PYTHON_THREADS' in os.environ and num_threads is not None:
+            environ_max_threads = int(os.environ['MAX_PYTHON_THREADS'])
+            if environ_max_threads > num_threads:
+                prettyoutput.Log("Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={0} threads))".format(num_threads))
+                
+            num_threads=min(environ_max_threads, num_threads)
+        
+        if num_threads is not None and os.name == 'nt':
+            if num_threads > 61:
+                num_threads = 61
+                #Limit the maximum number of threads to 63 due to Windows limit
+                #to waitall
+                #https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
+            
+            
         super(Thread_Pool, self).__init__(num_threads=num_threads,  WorkerCheckInterval=WorkerCheckInterval, *args, **kwargs)
 
         self._next_thread_id = 0
