@@ -218,20 +218,7 @@ class MultiprocessThread_Pool(nornir_pools.poolbase.PoolBase):
     def __init__(self, num_threads=None, maxtasksperchild=None, *args, **kwargs):
         self._tasks = None
         
-        if 'MAX_PYTHON_THREADS' in os.environ and num_threads is not None:
-            environ_max_threads = int(os.environ['MAX_PYTHON_THREADS'])
-            if environ_max_threads > num_threads:
-                prettyoutput.Log("Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={0} threads))".format(num_threads))
-                
-            num_threads=min(environ_max_threads, num_threads)
-        
-        if num_threads is not None and os.name == 'nt':
-            if num_threads > 61:
-                num_threads = 61
-                #Limit the maximum number of threads to 63 due to Windows limit
-                #to waitall
-                #https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
-            
+        num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
             
         self._num_processes = num_threads 
         self._maxtasksperchild = maxtasksperchild

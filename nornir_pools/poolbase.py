@@ -118,8 +118,11 @@ class LocalThreadPoolBase(PoolBase):
             self.WorkerCheckInterval = 2
         
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
+        
         if self._max_threads is None:
             self._max_threads = multiprocessing.cpu_count()
+            
+        self._max_threads = nornir_pools.ApplyOSThreadLimit(self._max_threads)
             
         self.tasks = queue.Queue(maxsize=self._max_threads * 32) #Queue for tasks yet to be completed by a thread
         #self.task_exceptions = queue.Queue() #Tasks that raise an unhandled exception are added to this queue

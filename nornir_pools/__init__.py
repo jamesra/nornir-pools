@@ -79,11 +79,14 @@ import shutil
 import six
 import logging
 
-import nornir_pools.processpool
-import nornir_pools.threadpool
-import nornir_pools.multiprocessthreadpool
-import nornir_pools.local_machine_pool
-import nornir_pools.serialpool
+import nornir_pools.task as task
+import nornir_pools.processpool as processpool
+import nornir_pools.threadpool as threadpool
+import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
+import nornir_pools.local_machine_pool as local_machine_pool
+import nornir_pools.serialpool as serialpool
+
+from nornir_shared import prettyoutput
 
 __ParallelPythonAvailable = False
 
@@ -95,11 +98,43 @@ except ImportError as e:
 
 dictKnownPools = {}
 
+max_windows_threads = 61
+
+def ApplyOSThreadLimit(num_threads):
+    """
+    :return The minimum of the maximum number of threads on the OS, the 
+    MAX_PYTHON_THREADS environment variable, or the requested num_threads
+    parameter, whichever is less 
+    """
+    global max_windows_threads
+    
+    if num_threads is None:
+        return None
+    
+    if 'MAX_PYTHON_THREADS' in os.environ:
+        environ_max_threads = int(os.environ['MAX_PYTHON_THREADS'])
+        if environ_max_threads > num_threads:
+            prettyoutput.Log("Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={0} threads))".format(num_threads))
+            
+        num_threads=min(environ_max_threads, num_threads)
+    
+    if os.name == 'nt':
+        if num_threads > max_windows_threads:
+            num_threads = max_windows_threads
+            prettyoutput.Log("Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+            #Limit the maximum number of threads to 63 due to Windows limit
+            #to waitall
+            #https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
+    
+    return num_threads
+
+
 __pool_management_lock = threading.RLock()
 
 def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
 
     global dictKnownPools
+    global __pool_management_lock
     
     with __pool_management_lock:
         if Poolname is None:
@@ -123,6 +158,7 @@ def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
 
 def WaitOnAllPools():
     global dictKnownPools
+    global __pool_management_lock
     
     pool_items = None
     with __pool_management_lock:
@@ -137,6 +173,7 @@ def WaitOnAllPools():
 def _remove_pool(p):
     '''Called from pool shutdown implementations to remove the pool from the map of existing pools'''
     global dictKnownPools
+    global __pool_management_lock
     
     pname = p
     if not isinstance(p, str):
@@ -154,6 +191,7 @@ def ClosePools():
     '''
     global dictKnownPools
     global profiler
+    global __pool_management_lock
     
     with __pool_management_lock:
         pool_items = list(dictKnownPools.items())
