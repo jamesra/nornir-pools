@@ -104,7 +104,7 @@ def ApplyOSThreadLimit(num_threads):
     """
     :return The minimum of the maximum number of threads on the OS, the 
     MAX_PYTHON_THREADS environment variable, or the requested num_threads
-    parameter, whichever is less 
+    parameter 
     """
     global max_windows_threads
     
@@ -114,14 +114,14 @@ def ApplyOSThreadLimit(num_threads):
     if 'MAX_PYTHON_THREADS' in os.environ:
         environ_max_threads = int(os.environ['MAX_PYTHON_THREADS'])
         if environ_max_threads > num_threads:
-            prettyoutput.Log("Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={0} threads))".format(num_threads))
+            prettyoutput.Log(f"Number of threads in pool limited to MAX_PYTHON_THREADS environment variable, (={num_threads} threads))")
             
         num_threads=min(environ_max_threads, num_threads)
     
     if os.name == 'nt':
         if num_threads > max_windows_threads:
             num_threads = max_windows_threads
-            prettyoutput.Log("Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+            prettyoutput.Log(f"Number of threads in pool limited to windows handle limit of {max_windows_threads}")
             #Limit the maximum number of threads to 63 due to Windows limit
             #to waitall
             #https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
