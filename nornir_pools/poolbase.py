@@ -145,7 +145,7 @@ class LocalThreadPoolBase(PoolBase):
     
     def add_threads_if_needed(self):
         
-        assert(False == self.shutdown_event.isSet())
+        assert(False == self.shutdown_event.is_set())
         
         self.remove_finished_threads()
         num_active_threads = len(self._threads)

@@ -198,7 +198,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
         return
 
     def add_worker_thread(self):
-        assert(False == self.shutdown_event.isSet())
+        assert(False == self.shutdown_event.is_set())
         
         worker_name = "Thread pool #%d" % (self._next_thread_id)
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval, name=worker_name) 
@@ -214,7 +214,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
             
         assert(callable(func))
         """Add a task to the queue"""
-        assert(False == self.shutdown_event.isSet())
+        assert(False == self.shutdown_event.is_set())
         
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
@@ -223,7 +223,7 @@ class Thread_Pool(poolbase.LocalThreadPoolBase):
 
         entry = ThreadTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
-        self.add_threads_if_needed() 
+        self.add_threads_if_needed()
         
         return entry
 
