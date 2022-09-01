@@ -128,7 +128,7 @@ class LocalThreadPoolBase(PoolBase):
         #self.task_exceptions = queue.Queue() #Tasks that raise an unhandled exception are added to this queue
         
     def shutdown(self):
-        if self.shutdown_event.isSet():
+        if self.shutdown_event.is_set():
             return
         
         self.wait_completion()
