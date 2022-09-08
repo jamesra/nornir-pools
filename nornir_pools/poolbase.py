@@ -50,6 +50,7 @@ class PoolBase(object):
         self._name = kwargs.get('name', None)
         self._last_job_report_time = time.time()
         self.job_report_interval_in_seconds = kwargs.get("job_report_interval", 10.0)
+        self._last_num_active_tasks = 0
 
     def add_task(self, name, func, *args, **kwargs):
         '''
@@ -79,10 +80,14 @@ class PoolBase(object):
         '''
         Report the current job count if we haven't reported it recently
         '''
+        if self.num_active_tasks < 2 and self._last_num_active_tasks < 2:
+            return 
+        
         now = time.time()
         time_since_last_report = now - self._last_job_report_time
         if time_since_last_report > self.job_report_interval_in_seconds:
-            time_since_last_report = now
+            self._last_job_report_time = now
+            self._last_num_active_tasks = self.num_active_tasks
             self.PrintActiveTaskCount()
              
     def PrintActiveTaskCount(self):
