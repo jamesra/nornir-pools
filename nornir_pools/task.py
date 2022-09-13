@@ -119,7 +119,7 @@ class TaskWithEvent(Task):
         :return: True if the task is completed, otherwise False
         :rtype: bool
         '''
-        return self.completed.isSet()
+        return self.completed.is_set()
 
     def wait(self):
         self.completed.wait()

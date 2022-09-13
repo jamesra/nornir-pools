@@ -230,9 +230,8 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
             if not 'shell' in kwargs:
                 kwargs['shell'] = True
         else:
-            kwargs = {}
-            kwargs['shell'] = True
-            
+            kwargs = {'shell': True}
+
         if func is str:
             entry = ImmediateProcessTask(name, func, *args, **kwargs)
         else:
