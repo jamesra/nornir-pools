@@ -15,12 +15,12 @@ import nornir_pools
 
 import cProfile
 import os 
-import time
+#import time
 from nornir_shared import prettyoutput
 
 #from threading import Lock
 
-_profiler = None
+_profiler = None  # type: None | cProfile.Profile
 
  
 def _poolinit(profile_dir=None):

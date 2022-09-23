@@ -23,8 +23,10 @@ class ImmediateProcessTask(task.TaskWithEvent):
     '''Launches processes without threads'''
 
     def __init__(self, name, func, *args, **kwargs):
-        super(ProcessTask, self).__init__(name, *args, **kwargs)
+        super(ImmediateProcessTask, self).__init__(name, *args, **kwargs)
+        self.proc = None
         self.cmd = func
+        self.returned_value = None
         self.Run()
 
     def Run(self):

@@ -149,7 +149,7 @@ def RemoteWorkerProcess(cmd, fargs):
         entry['returncode'] = -1
         entry['node'] = socket.gethostname()
 
-        error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
+        error_message = "*** {0}".format(traceback.format_exc())
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
         # sys.stderr.write(error_message)
@@ -188,7 +188,7 @@ def RemoteFunction(func, fargs):
         # inform operator of the name of the task throwing the exception
         # also, intercept the traceback and send to stderr.write() to avoid interweaving of traceback lines from parallel threads
 
-        error_message = "*** {0}\n{1}\n".format(traceback.format_exc())
+        error_message = "*** {0}".format(traceback.format_exc())
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
         # sys.stderr.write(error_message)
