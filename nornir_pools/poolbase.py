@@ -1,4 +1,5 @@
 from six.moves import queue
+import abc
 import threading
 import time
 import multiprocessing
@@ -98,7 +99,7 @@ class PoolBase(object):
         return
 
 
-class LocalThreadPoolBase(PoolBase):
+class LocalThreadPoolBase(abc.ABC, PoolBase):
     '''Base class for pools that rely on local threads and a queue to dispatch jobs'''
 
     WorkerCheckInterval = 0.5  # How often workers check for new jobs in the queue

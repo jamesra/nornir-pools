@@ -115,7 +115,7 @@ class Worker(threading.Thread):
                 entry = self.tasks.get(True, self.queue_wait_time)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
             except:
                 # Check if we should kill the thread
-                if(self.shutdown_event.isSet()):
+                if self.shutdown_event.is_set():
                     # _sprint ("Queue Empty, exiting worker thread")
                     self.deadthreadqueue.put(self)
                     return
