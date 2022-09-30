@@ -84,6 +84,8 @@ import logging
 
 import nornir_pools.poolbase as poolbase
 import nornir_pools.task as task
+from nornir_pools.task import Task
+
 import nornir_pools.processpool as processpool
 import nornir_pools.threadpool as threadpool
 import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
