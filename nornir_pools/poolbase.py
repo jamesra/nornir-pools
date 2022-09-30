@@ -1,5 +1,5 @@
-from six.moves import queue
-import abc
+import queue
+from abc import *
 import threading
 import time
 import multiprocessing
@@ -7,21 +7,22 @@ import logging
 import nornir_pools
 
 
-class PoolBase(object):
+class PoolBase(ABC):
     '''
     Pool objects provide the interface to create tasks on the pool.
     '''
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @name.setter
-    def name(self, val):
+    def name(self, val: str):
         self._name = val
 
     @property
-    def num_active_tasks(self):
+    @abstractmethod
+    def num_active_tasks(self) -> int:
         raise NotImplementedError()
 
     @property
@@ -34,12 +35,14 @@ class PoolBase(object):
     def __str__(self):
         return "Pool {0} with {1} active tasks".format(self.name, self.num_active_tasks)
 
+    @abstractmethod
     def shutdown(self):
         '''
         The pool waits for all tasks to complete and frees any resources such as threads in a thread pool
         '''
         raise NotImplementedError()
 
+    @abstractmethod
     def wait_completion(self):
         '''
         Blocks until all tasks have completed        
@@ -54,6 +57,7 @@ class PoolBase(object):
         self.job_report_interval_in_seconds = kwargs.get("job_report_interval", 10.0)
         self._last_num_active_tasks = 0
 
+    @abstractmethod
     def add_task(self, name, func, *args, **kwargs):
         '''
         Call a python function on the pool
@@ -66,6 +70,7 @@ class PoolBase(object):
         '''
         raise NotImplementedError()
 
+    @abstractmethod
     def add_process(self, name, func, *args, **kwargs):
         '''
         Invoke a process on the pool.  This function creates a task using name and then invokes pythons subprocess
@@ -99,13 +104,13 @@ class PoolBase(object):
         return
 
 
-class LocalThreadPoolBase(abc.ABC, PoolBase):
+class LocalThreadPoolBase(PoolBase, ABC):
     '''Base class for pools that rely on local threads and a queue to dispatch jobs'''
 
     WorkerCheckInterval = 0.5  # How often workers check for new jobs in the queue
 
     @property
-    def num_active_tasks(self):
+    def num_active_tasks(self) -> int:
         return self.tasks.qsize()
 
     def __init__(self, *args, **kwargs):
@@ -147,13 +152,13 @@ class LocalThreadPoolBase(abc.ABC, PoolBase):
         time.sleep(self.WorkerCheckInterval + 1)
         del self._threads
 
-    #
+    @abstractmethod
     def add_worker_thread(self):
         raise NotImplementedError("add_worker_thread must be implemented by derived class and return a thread object")
 
     def add_threads_if_needed(self):
 
-        assert (False == self.shutdown_event.is_set())
+        assert (self.shutdown_event.is_set() is False)
 
         self.remove_finished_threads()
         num_active_threads = len(self._threads)
@@ -188,8 +193,8 @@ class LocalThreadPoolBase(abc.ABC, PoolBase):
                         if t == self._threads[i]:
                             del self._threads[i]
                             break
-        except queue.Empty as e:
-            return
+        except queue.Empty:
+            pass
 
         return
 

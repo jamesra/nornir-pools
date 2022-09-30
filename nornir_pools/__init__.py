@@ -82,6 +82,7 @@ import pstats
 import glob
 import logging
 
+import nornir_pools.poolbase as poolbase
 import nornir_pools.task as task
 import nornir_pools.processpool as processpool
 import nornir_pools.threadpool as threadpool
@@ -232,7 +233,7 @@ def GetThreadPool(Poolname=None, num_threads=None):
     '''
     Get or create a specific thread pool using vanilla python threads    
     '''
-    return __CreatePool(nornir_pools.threadpool.Thread_Pool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
 
 
 def GetLocalMachinePool(Poolname=None, num_threads=None, is_global=False):
@@ -243,14 +244,14 @@ def GetMultithreadingPool(Poolname=None, num_threads=None):
     '''Get or create a specific thread pool to execute threads in other processes on the same computer using the
     multiprocessing library '''
     warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
-    return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThread_Pool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
 
 
 def GetProcessPool(Poolname=None, num_threads=None):
     '''Get or create a specific pool to invoke shell command processes on the same computer using the subprocess
     module '''
     warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
-    return __CreatePool(nornir_pools.processpool.Process_Pool, Poolname, num_threads)
+    return __CreatePool(nornir_pools.processpool.ProcessPool, Poolname, num_threads)
 
 
 def GetParallelPythonPool(Poolname=None, num_threads=None):

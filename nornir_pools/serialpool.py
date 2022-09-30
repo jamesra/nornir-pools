@@ -4,6 +4,7 @@ Created on Apr 17, 2014
 @author: u0490822
 '''
 
+from typing import Callable
 import subprocess
 import nornir_pools
 from . import poolbase
@@ -40,12 +41,12 @@ class SerialPool(poolbase.PoolBase):
         super(SerialPool, self).__init__(*args, **kwargs)
  
 
-    def add_task(self, name, func, *args, **kwargs):
+    def add_task(self, name: str, func: Callable, *args, **kwargs):
         retval = func(*args, **kwargs)
         return nornir_pools.task.SerialTask(name, retval, *args, **kwargs)
         
 
-    def add_process(self, name, func, *args, **kwargs):
+    def add_process(self, name: str, func: Callable, *args, **kwargs):
         SingleParameterProc = subprocess.Popen(func + " && exit", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         entry =  nornir_pools.processpool.ProcessTask(name, func, *args, **kwargs)

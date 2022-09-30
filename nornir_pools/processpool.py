@@ -1,10 +1,11 @@
 # threadpool.py
-
+import queue
 # Initially patterned from http://code.activestate.com/recipes/577187-python-thread-pool/
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
-import math 
+from typing import *
+import math
 import sys
 import threading
 import time
@@ -13,7 +14,7 @@ import subprocess
 #import logging 
 
 import nornir_pools
-from . import poolbase
+from nornir_pools import poolbase
 
 from . import task
 from nornir_shared import prettyoutput
@@ -22,11 +23,13 @@ from nornir_shared import prettyoutput
 class ImmediateProcessTask(task.TaskWithEvent):
     '''Launches processes without threads'''
 
-    def __init__(self, name, func, *args, **kwargs):
+    def __init__(self, name: str, func: str, *args, **kwargs):
         super(ImmediateProcessTask, self).__init__(name, *args, **kwargs)
-        self.proc = None
-        self.cmd = func
-        self.returned_value = None
+        self.proc = None  # type: subprocess.Popen | None
+        self.cmd = func  # type: str
+        self.returned_value = None  # type: Any
+        self.stdoutdata: str
+        self.stderrdata: str
         self.Run()
 
     def Run(self):
@@ -64,13 +67,14 @@ class ImmediateProcessTask(task.TaskWithEvent):
         self.set_completion_time()
         self.completed.set()
 
-    def wait_return(self):
+    def wait_return(self) -> str:
         self.wait()
         return self.stdoutdata
 
+
 class ProcessTask(task.TaskWithEvent):
 
-    def __init__(self, name, func, *args, **kwargs):
+    def __init__(self, name: str, func: Callable, *args, **kwargs):
         super(ProcessTask, self).__init__(name, *args, **kwargs)
         self.cmd = func
 
@@ -92,7 +96,12 @@ class Worker(threading.Thread):
 
     """Thread executing tasks from a given tasks queue"""
  
-    def __init__(self, tasks, deadthreadqueue, shutdown_event, queue_wait_time, **kwargs):
+    def __init__(self,
+                 tasks: queue.Queue,
+                 deadthreadqueue: queue.Queue,
+                 shutdown_event: threading.Event,
+                 queue_wait_time: float,
+                 **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
@@ -191,17 +200,19 @@ class Worker(threading.Thread):
             self.tasks.task_done()
 
 
-class Process_Pool(poolbase.LocalThreadPoolBase):
+class ProcessPool(poolbase.LocalThreadPoolBase):
 
     """Pool of threads consuming tasks from a queue"""
-    
+
+    def add_task(self, name:str, func: Callable, *args, **kwargs):
+        self.add_process(name, func, *args, **kwargs)
 
     def __init__(self, num_threads=None, WorkerCheckInterval = 0.5):
         '''
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
-        super(Process_Pool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
+        super(ProcessPool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
         
         self._next_thread_id = 0
         #self.logger.warn("Creating Process Pool")
@@ -214,33 +225,38 @@ class Process_Pool(poolbase.LocalThreadPoolBase):
         return w
 
 
-    def add_process(self, name, func, *args, **kwargs):
-        """Add a task to the queue, args are passed directly to subprocess.Popen"""
-        if isinstance(func, str):
-            pass
-        elif func is None:
-            prettyoutput.LogErr("Process pool add task {0} called with 'None' as function".format(name))
-        elif callable(func) == False:
-            prettyoutput.LogErr("Process pool add task {0} parameter was non-callable value {1} when it should be passed a function".format(name, func))
-            
-        assert(isinstance(func, str) or callable(func))
+    def add_process(self, name: str, func: Callable | str, *args, **kwargs):
+        """
+        Add a task to the queue, args are passed directly to subprocess.Popen
+        :param name: The name of the task
+        :param func: If a string is passed a
+        process is started and the string is executed as a console command.  If a callable is passed the multiprocess
+        is used to invoke the function in another process.
+        """
+
         # keep_alive_thread is a non-daemon thread started when the queue is non-empty.
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
         
         if isinstance(kwargs, dict):
-            if not 'shell' in kwargs:
+            if 'shell' not in kwargs:
                 kwargs['shell'] = True
         else:
             kwargs = {'shell': True}
 
-        if func is str:
+        if isinstance(func, str):
             entry = ImmediateProcessTask(name, func, *args, **kwargs)
-        else:
+        elif callable(func):
             entry = ProcessTask(name, func, *args, **kwargs)
+        elif func is None:
+            info = f"Process pool add task {name} called with 'None' as function"
+            prettyoutput.LogErr(info)
+            raise ValueError(info)
+        else:
+            info = f"Process pool add task {name} parameter was Non-callable and non-string value {func}"
+            prettyoutput.LogErr(info)
+            raise ValueError(info)
             
         self.tasks.put(entry)
         self.add_threads_if_needed()
-
-
         return entry
