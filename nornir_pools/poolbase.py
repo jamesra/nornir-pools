@@ -150,7 +150,7 @@ class LocalThreadPoolBase(PoolBase, ABC):
 
         # Give threads time to die gracefully
         time.sleep(self.WorkerCheckInterval + 1)
-        del self._threads
+        self._threads.clear()
 
     @abstractmethod
     def add_worker_thread(self):
