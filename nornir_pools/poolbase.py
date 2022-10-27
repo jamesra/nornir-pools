@@ -1,3 +1,4 @@
+import atexit
 import queue
 from abc import *
 import threading
@@ -103,21 +104,40 @@ class PoolBase(ABC):
         nornir_pools._PrintProgressUpdate(JobQText)
         return
 
-
 class LocalThreadPoolBase(PoolBase, ABC):
     '''Base class for pools that rely on local threads and a queue to dispatch jobs'''
 
-    WorkerCheckInterval = 0.5  # How often workers check for new jobs in the queue
-
+    WorkerCheckInterval = 1  # How often workers check for events to end themselves if there are no queue events
+    AtExitRegisteredWaitTime = 0 # How long we will wait atexit to ensure threads have time to shutdown.  Should be the max WorkerCheckInterval of any Threadpool started.
+    AtExitLock = threading.Lock()
+     
     @property
     def num_active_tasks(self) -> int:
         return self.tasks.qsize()
+    
+    @classmethod
+    def TryRegisterAtExit(cls, wait_time: float):
+        """Register a wait atexit so we don't leave threads alive when the program exits and get an error message"""
+        if cls.AtExitRegisteredWaitTime >= wait_time:
+            return
+        
+        try:
+            if cls.AtExitLock.acquire():
+                if cls.AtExitRegisteredWaitTime >= wait_time:
+                    return
+                
+                atexit.register(time.sleep, wait_time)
+                cls.AtExitRegisteredWaitTime = wait_time
+        finally:
+            cls.AtExitLock.release()
 
     def __init__(self, *args, **kwargs):
         '''
         :param int num_threads: number of threads, defaults to number of cores installed on system
         '''
         super(LocalThreadPoolBase, self).__init__(*args, **kwargs)
+        
+        
 
         self.deadthreadqueue = queue.Queue()  # Threads put themselves here when they die
         self.shutdown_event = threading.Event()
@@ -127,7 +147,9 @@ class LocalThreadPoolBase(PoolBase, ABC):
 
         self.WorkerCheckInterval = kwargs.get('WorkerCheckInterval', None)
         if self.WorkerCheckInterval is None:
-            self.WorkerCheckInterval = 2
+            self.WorkerCheckInterval = LocalThreadPoolBase.WorkerCheckInterval
+            
+        LocalThreadPoolBase.TryRegisterAtExit(self.WorkerCheckInterval * 1.25)
 
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
 
@@ -148,8 +170,8 @@ class LocalThreadPoolBase(PoolBase, ABC):
 
         nornir_pools._remove_pool(self)
 
-        # Give threads time to die gracefully
-        time.sleep(self.WorkerCheckInterval + 1)
+        # Give threads time to check for new work and die gracefully
+        #time.sleep(self.WorkerCheckInterval * 1.5)
         self._threads.clear()
 
     @abstractmethod
