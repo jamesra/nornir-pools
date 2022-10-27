@@ -136,9 +136,7 @@ class LocalThreadPoolBase(PoolBase, ABC):
         :param int num_threads: number of threads, defaults to number of cores installed on system
         '''
         super(LocalThreadPoolBase, self).__init__(*args, **kwargs)
-        
-        
-
+         
         self.deadthreadqueue = queue.Queue()  # Threads put themselves here when they die
         self.shutdown_event = threading.Event()
         self.shutdown_event.clear()
@@ -169,9 +167,8 @@ class LocalThreadPoolBase(PoolBase, ABC):
         self.shutdown_event.set()
 
         nornir_pools._remove_pool(self)
-
-        # Give threads time to check for new work and die gracefully
-        #time.sleep(self.WorkerCheckInterval * 1.5)
+        
+        #The static atexit method gives threads time to die gracefully 
         self._threads.clear()
 
     @abstractmethod
