@@ -82,6 +82,10 @@ import pstats
 import glob
 import logging
 
+from typing import Callable
+
+import nornir_pools.ipool as ipool
+from nornir_pools.ipool import IPool
 import nornir_pools.poolbase as poolbase
 import nornir_pools.task as task
 from nornir_pools.task import Task
@@ -140,7 +144,10 @@ def ApplyOSThreadLimit(num_threads):
 __pool_management_lock = threading.RLock()
 
 
-def __CreatePool(poolclass, Poolname=None, num_threads=None, *args, **kwargs):
+def __CreatePool(poolclass: Callable[[int, list | None, dict | None], IPool],
+                 Poolname: str | None = None,
+                 num_threads: int | None = None,
+                 *args, **kwargs) -> IPool:
     global dictKnownPools
     global __pool_management_lock
 
@@ -179,7 +186,7 @@ def WaitOnAllPools():
         pool.wait_completion()
 
 
-def _remove_pool(p):
+def _remove_pool(p: str | IPool):
     '''Called from pool shutdown implementations to remove the pool from the map of existing pools'''
     global dictKnownPools
     global __pool_management_lock
@@ -231,38 +238,38 @@ def ClosePools():
             pool_items = list(dictKnownPools.items())
 
 
-def GetThreadPool(Poolname=None, num_threads=None):
+def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     '''
     Get or create a specific thread pool using vanilla python threads    
     '''
     return __CreatePool(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
 
 
-def GetLocalMachinePool(Poolname=None, num_threads=None, is_global=False):
+def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = None, is_global=False) -> IPool:
     return __CreatePool(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads, is_global=is_global)
 
 
-def GetMultithreadingPool(Poolname=None, num_threads=None):
+def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     '''Get or create a specific thread pool to execute threads in other processes on the same computer using the
     multiprocessing library '''
     warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
     return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
 
 
-def GetProcessPool(Poolname=None, num_threads=None):
+def GetProcessPool(Poolname: str | None = None, num_threads: int | None = None) -> processpool.ProcessPool:
     '''Get or create a specific pool to invoke shell command processes on the same computer using the subprocess
     module '''
     warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
     return __CreatePool(nornir_pools.processpool.ProcessPool, Poolname, num_threads)
 
 
-def GetParallelPythonPool(Poolname=None, num_threads=None):
+def GetParallelPythonPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     '''Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel
     python '''
     return __CreatePool(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
-def GetSerialPool(Poolname=None, num_threads=None):
+def GetSerialPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     '''
     Get or create a specific thread pool using vanilla python threads    
     '''
@@ -271,7 +278,7 @@ def GetSerialPool(Poolname=None, num_threads=None):
     return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
 
 
-def GetGlobalSerialPool():
+def GetGlobalSerialPool() -> IPool:
     '''
     Common pool for processes on the local machine
     '''
@@ -279,7 +286,7 @@ def GetGlobalSerialPool():
     # return GetProcessPool("Global local process pool")
 
 
-def GetGlobalProcessPool():
+def GetGlobalProcessPool() -> processpool.ProcessPool:
     '''
     Common pool for processes on the local machine
     '''
@@ -287,7 +294,7 @@ def GetGlobalProcessPool():
     # return GetProcessPool("Global local process pool")
 
 
-def GetGlobalLocalMachinePool():
+def GetGlobalLocalMachinePool() -> IPool:
     '''
     Common pool for launching other processes for threads or executables.  Combines multithreading and process pool
     interface.
@@ -296,7 +303,7 @@ def GetGlobalLocalMachinePool():
     return GetLocalMachinePool(Poolname="Global local machine pool", is_global=True)
 
 
-def GetGlobalClusterPool():
+def GetGlobalClusterPool() -> IPool:
     '''
     Get the common pool for placing tasks on the cluster
     '''
@@ -307,14 +314,14 @@ def GetGlobalClusterPool():
     return GetParallelPythonPool("Global cluster pool")
 
 
-def GetGlobalThreadPool():
+def GetGlobalThreadPool() -> IPool:
     '''
     Common pool for thread based tasks
     '''
     return GetThreadPool("Global local thread pool")
 
 
-def GetGlobalMultithreadingPool():
+def GetGlobalMultithreadingPool() -> IPool:
     '''
     Common pool for multithreading module tasks, threads run in different python processes to work around the global
     interpreter lock
@@ -327,7 +334,7 @@ def GetGlobalMultithreadingPool():
 __LastConsoleWrite = datetime.datetime.utcnow()
 
 
-def __CleanOutputForEclipse(s):
+def __CleanOutputForEclipse(s: str):
     s = s.replace('\b', '')
     s = s.replace('.', '')
     s = s.strip()
@@ -335,7 +342,7 @@ def __CleanOutputForEclipse(s):
     return s
 
 
-def __EclipseConsoleWrite(s, newline=False):
+def __EclipseConsoleWrite(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
         es = es + '\n'
@@ -343,7 +350,7 @@ def __EclipseConsoleWrite(s, newline=False):
     sys.stdout.write(es)
 
 
-def __EclipseConsoleWriteError(s, newline=False):
+def __EclipseConsoleWriteError(s: str, newline:bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
         es = es + '\n'
@@ -351,7 +358,7 @@ def __EclipseConsoleWriteError(s, newline=False):
     sys.stderr.write(es)
 
 
-def __PrintProgressUpdateEclipse(s):
+def __PrintProgressUpdateEclipse(s: str):
     global __LastConsoleWrite
 
     now = datetime.datetime.utcnow()
@@ -364,21 +371,21 @@ def __PrintProgressUpdateEclipse(s):
     __LastConsoleWrite = datetime.datetime.utcnow()
 
 
-def __ConsoleWrite(s, newline=False):
+def __ConsoleWrite(s: str, newline: bool = False):
     if newline:
         s = s + '\n'
 
     sys.stdout.write(s)
 
 
-def __ConsoleWriteError(s, newline=False):
+def __ConsoleWriteError(s: str, newline: bool = False):
     if newline:
         s = s + '\n'
 
     sys.stderr.write(s)
 
 
-def _PrintError(s):
+def _PrintError(s: str):
     if 'ECLIPSE' in os.environ:
         __EclipseConsoleWrite(s)
         return
@@ -386,7 +393,7 @@ def _PrintError(s):
     __ConsoleWriteError(s, newline=True)
 
 
-def _PrintWarning(s):
+def _PrintWarning(s: str):
     if 'ECLIPSE' in os.environ:
         __PrintProgressUpdateEclipse(s)
         return
@@ -394,7 +401,7 @@ def _PrintWarning(s):
     __ConsoleWrite(s, newline=True)
 
 
-def _PrintProgressUpdate(s):
+def _PrintProgressUpdate(s: str):
     if 'ECLIPSE' in os.environ:
         __PrintProgressUpdateEclipse(s)
         return
@@ -402,7 +409,7 @@ def _PrintProgressUpdate(s):
     __ConsoleWrite(s)
 
 
-def _sprint(s):
+def _sprint(s: str):
     """ Thread-safe print fucntion """
     # Eclipse copies test output to the unit test window and this copy has
     # problems if the output has non-alphanumeric characters
@@ -412,7 +419,7 @@ def _sprint(s):
         __ConsoleWrite(s, newline=True)
 
 
-def _pprint(s):
+def _pprint(s: str):
     """ Thread-safe print fucntion, no newline """
 
     # Eclipse copies test output to the unit test window and this copy has
@@ -514,7 +521,7 @@ def aggregate_profiler_data(output_path):
 #      
 
 
-def MergeProfilerStats(root_output_dir, profile_dir, pool_name):
+def MergeProfilerStats(root_output_dir: str, profile_dir: str, pool_name: str):
     '''Called by atexit.  Merges all *.profile files in the profile_dir into a single .profile file'''
     profile_files = glob.glob(os.path.join(profile_dir, "**", "*.pstats"), recursive=True)
 

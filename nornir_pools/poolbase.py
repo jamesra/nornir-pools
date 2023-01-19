@@ -6,9 +6,10 @@ import time
 import multiprocessing
 import logging
 import nornir_pools
+from nornir_pools.ipool import IPool
 
 
-class PoolBase(ABC):
+class PoolBase(IPool):
     '''
     Pool objects provide the interface to create tasks on the pool.
     '''
@@ -22,11 +23,6 @@ class PoolBase(ABC):
         self._name = val
 
     @property
-    @abstractmethod
-    def num_active_tasks(self) -> int:
-        raise NotImplementedError()
-
-    @property
     def logger(self):
         if self._logger is None:
             self._logger = logging.getLogger(__name__)
@@ -36,20 +32,6 @@ class PoolBase(ABC):
     def __str__(self):
         return "Pool {0} with {1} active tasks".format(self.name, self.num_active_tasks)
 
-    @abstractmethod
-    def shutdown(self):
-        '''
-        The pool waits for all tasks to complete and frees any resources such as threads in a thread pool
-        '''
-        raise NotImplementedError()
-
-    @abstractmethod
-    def wait_completion(self):
-        '''
-        Blocks until all tasks have completed        
-        '''
-        raise NotImplementedError()
-
     def __init__(self, *args, **kwargs):
         # self.logger = logging.getLogger(__name__)
         self._logger = None
@@ -57,32 +39,6 @@ class PoolBase(ABC):
         self._last_job_report_time = time.time()
         self.job_report_interval_in_seconds = kwargs.get("job_report_interval", 10.0)
         self._last_num_active_tasks = 0
-
-    @abstractmethod
-    def add_task(self, name, func, *args, **kwargs):
-        '''
-        Call a python function on the pool
-
-        :param str name: Friendly name of the task. Non-unique
-        :param function func: Python function pointer to invoke on the pool
-
-        :returns: task object
-        :rtype: task
-        '''
-        raise NotImplementedError()
-
-    @abstractmethod
-    def add_process(self, name, func, *args, **kwargs):
-        '''
-        Invoke a process on the pool.  This function creates a task using name and then invokes pythons subprocess
-
-        :param str name: Friendly name of the task. Non-unique
-        :param function func: Process name to invoke using subprocess
-
-        :returns: task object
-        :rtype: task
-        '''
-        raise NotImplementedError()
 
     def TryReportActiveTaskCount(self):
         '''

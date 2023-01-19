@@ -225,7 +225,7 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
         return w
 
 
-    def add_process(self, name: str, func: Callable | str, *args, **kwargs):
+    def add_process(self, name: str, func: Callable[..., Any] | str, *args, **kwargs):
         """
         Add a task to the queue, args are passed directly to subprocess.Popen
         :param name: The name of the task
