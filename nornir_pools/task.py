@@ -1,30 +1,33 @@
+from abc import *
+import datetime
 import threading
 import time
 import math
+from typing import Any
 
 
-class Task(object):
+class Task(ABC):
     '''     
     Represents a task assigned to a pool.  Responsible for allowing the caller to wait for task completion, raising any exceptions, and returning data from the call.
     Task objects are created by adding tasks or processes to the pools.  They are not intended to be created directly by callers.
     '''
     
-    _NextID = 0
+    _NextID = 0  # type: int
     _IDLock = threading.Lock()
      
     @property
-    def task_id(self):
+    def task_id(self) -> int:
         return self.__task_id__
     
     @classmethod
-    def GenerateID(cls):
+    def GenerateID(cls) -> int:
         with cls._IDLock:
             _id = cls._NextID
             cls._NextID = cls._NextID + 1
             return _id
     
     @property
-    def elapsed_time(self):
+    def elapsed_time(self) -> datetime.datetime:
         endtime = self.task_end_time
         if endtime is None:
             endtime = time.time()
@@ -32,7 +35,7 @@ class Task(object):
         return endtime - self.task_start_time 
     
     @property
-    def elapsed_time_str(self):
+    def elapsed_time_str(self) -> str:
         t_delta = self.elapsed_time
                         
         seconds = math.fmod(t_delta, 60)
@@ -62,6 +65,7 @@ class Task(object):
         out_string += time_str
         return out_string
 
+    @abstractmethod
     def wait(self):
         '''
         Wait for task to complete, does not return a value
@@ -71,7 +75,8 @@ class Task(object):
 
         raise NotImplementedError()
 
-    def wait_return(self):
+    @abstractmethod
+    def wait_return(self) -> Any:
         '''
         Wait for task to complete and return the value
         
@@ -81,8 +86,8 @@ class Task(object):
         '''
         raise Exception("Not implemented")
 
-    @property
-    def iscompleted(self):
+    @abstractmethod
+    def iscompleted(self) -> bool:
         '''
         Non-blocking test to determine if task has completed.  No exception is raised if the task raised an exception during execution until wait or wait_return is called.
 
@@ -101,7 +106,7 @@ class Task(object):
         return self.__task_id__
 
 
-class TaskWithEvent(Task):
+class TaskWithEvent(Task, ABC):
     '''
     Task object with built-in event for completion
     '''
@@ -112,14 +117,14 @@ class TaskWithEvent(Task):
         self.returncode = 0
 
     @property
-    def iscompleted(self):
+    def iscompleted(self) -> bool:
         '''
         Non-blocking test to determine if task has completed.  No exception is raised if the task raised an exception during execution until wait or wait_return is called.
 
         :return: True if the task is completed, otherwise False
         :rtype: bool
         '''
-        return self.completed.isSet()
+        return self.completed.is_set()
 
     def wait(self):
         self.completed.wait()
@@ -128,13 +133,13 @@ class TaskWithEvent(Task):
 class SerialTask(Task):
     '''Used for debugging and profiling.  Returns a task object but the function has been run serially.'''
      
-    def __init__(self, name, retval, *args, **kwargs):
+    def __init__(self, name: str, retval: Any, *args, **kwargs):
         super(SerialTask, self).__init__(name, *args, **kwargs)
         self._retval = retval
-        self.returncode = 0
+        self.returncode = 0  # type: int
         
     @property
-    def iscompleted(self):
+    def iscompleted(self) -> bool:
         return True
     
     def wait(self):

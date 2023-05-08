@@ -3,6 +3,7 @@ Created on Apr 17, 2014
 
 @author: u0490822
 '''
+import os
 
 import nornir_pools
 from . import poolbase
@@ -51,6 +52,8 @@ class LocalMachinePool(poolbase.PoolBase):
         '''
         Constructor
         '''
+        
+        num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
 
         self._num_threads = num_threads
         

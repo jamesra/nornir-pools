@@ -95,7 +95,7 @@ def VerifyExceptionBehaviour(test, pool):
         task = pool.add_task(exceptText, RaiseException, exceptText)
         pool.wait_completion()
         
-        task.wait();
+        task.wait()
     except IntentionalPoolException as e:
         print("Correctly found exception in thread\n" + str(e))
         ExceptionFound = True
