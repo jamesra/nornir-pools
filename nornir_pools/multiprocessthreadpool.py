@@ -215,16 +215,23 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     @property
     def tasks(self):
         if self._tasks is None:
-            self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes)
+            self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes, initializer=nornir_pools.init_pool_process, initargs=(self._lock,))
 
         return self._tasks
+
+    @property
+    def lock(self):
+        '''A lock that is shared among all child processes'''
+        return self._lock
 
     @property
     def num_active_tasks(self):
         return len(self._active_tasks)
 
-    def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None, *args, **kwargs):
+    def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None, authkey: bytes | None = None,
+                 *args, **kwargs):
         self._tasks = None
+        self._lock = multiprocessing.Lock()
 
         num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
 
@@ -232,6 +239,9 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         self._maxtasksperchild = maxtasksperchild
         # A list of incomplete AsyncResults
         self._active_tasks = {}  # type : Dict[int, MultiprocessThreadTask]
+
+        #self.authkey = multiprocessing.current_process().authkey if authkey is None else authkey
+        #self._shared_memory_manager = nornir_pools.get_or_create_shared_memory_manager(self.authkey)
 
         super(MultiprocessThreadPool, self).__init__(*args, **kwargs)
 

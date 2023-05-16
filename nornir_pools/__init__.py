@@ -95,6 +95,9 @@ import nornir_pools.threadpool as threadpool
 import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
 import nornir_pools.local_machine_pool as local_machine_pool
 import nornir_pools.serialpool as serialpool
+import nornir_pools.shared_memory as shared_memory
+
+from nornir_pools.shared_memory import get_or_create_shared_memory_manager
 
 from nornir_shared import prettyoutput
 
@@ -109,6 +112,13 @@ except ImportError as e:
 dictKnownPools = {}
 
 max_windows_threads = 61
+
+shared_lock = None #A multiprocessing.Lock that all child processes shared.
+                   # The lock can be accessed from multiprocessthreadpool from the parent process as well
+
+def init_pool_process(the_lock):
+    global shared_lock
+    shared_lock = the_lock
 
 
 def ApplyOSThreadLimit(num_threads):
