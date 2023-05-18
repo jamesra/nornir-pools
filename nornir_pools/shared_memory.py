@@ -1,17 +1,18 @@
+import atexit
 import multiprocessing
 import os
-from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.managers import SharedMemoryManager
-import atexit
 
-_shared_memory_manager = None #  type: SharedMemoryManager
- 
+_shared_memory_manager = None  # type: SharedMemoryManager
+
+
 def _stop_shared_memory_manager():
     global _shared_memory_manager
     if _shared_memory_manager is not None:
-        #if 'shutdown' in _shared_memory_manager:
+        # if 'shutdown' in _shared_memory_manager:
         _shared_memory_manager.shutdown()
         _shared_memory_manager = None
+
 
 def get_or_create_shared_memory_manager(authkey: bytes | None = None):
     '''
@@ -38,4 +39,3 @@ def get_or_create_shared_memory_manager(authkey: bytes | None = None):
                 os.environ['SHARED_MEMORY_AUTHKEY'] = authkey.hex()
 
     return _shared_memory_manager
-

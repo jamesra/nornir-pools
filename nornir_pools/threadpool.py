@@ -4,20 +4,21 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
-from typing import *
 import math
+# import traceback
+import queue
 import threading
 import time
-#import traceback
-import queue
-# import os
-# import logging
-
-import nornir_pools.task as task
+from typing import *
 
 import nornir_pools
 import nornir_pools.poolbase as poolbase
+import nornir_pools.task as task
 from nornir_shared import prettyoutput
+
+
+# import os
+# import logging
 
 
 class ThreadTask(task.TaskWithEvent):
@@ -208,7 +209,7 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         return
 
     def add_worker_thread(self) -> Worker:
-        assert ( self.shutdown_event.is_set() is False)
+        assert (self.shutdown_event.is_set() is False)
 
         worker_name = "Thread pool #%d" % self._next_thread_id
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval, name=worker_name)

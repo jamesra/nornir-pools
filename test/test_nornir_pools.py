@@ -3,14 +3,15 @@ Created on Feb 14, 2013
 
 @author: u0490822
 '''
-import unittest
-import os
-import shutil
-import nornir_pools as pools
-import time
-import random
-import multiprocessing
 import collections
+import multiprocessing
+import os
+import random
+import shutil
+import time
+import unittest
+
+import nornir_pools as pools
 
 
 def CreateFile(path, number):
@@ -25,7 +26,6 @@ def CreateFile(path, number):
 
 
 def ReadFile(path, number):
-
     filename = TestThreadPool.FilenameTemplate % number
     filenamefullpath = os.path.join(path, filename)
 
@@ -37,29 +37,33 @@ def ReadFile(path, number):
 
     return int(numStr)
 
+
 def SleepForRandomTime(MaxTime=0.25):
     '''Sleep for a random amount of time and return the pid we slept on'''
     sleepTime = random.random() * MaxTime
     time.sleep(sleepTime)
     return os.getpid()
 
-def CreateFileWithDelay(path, number):
-        '''Create a file in the path whose name is [number].txt
-           store the number in the file.'''
 
-        SleepForRandomTime()
-        return CreateFile(path, number)
+def CreateFileWithDelay(path, number):
+    '''Create a file in the path whose name is [number].txt
+       store the number in the file.'''
+
+    SleepForRandomTime()
+    return CreateFile(path, number)
+
 
 def ReadFileWithDelay(path, number):
+    SleepForRandomTime()
+    return ReadFile(path, number)
 
-        SleepForRandomTime()
-        return ReadFile(path, number)
 
 def RaiseException(msg=None):
     if msg is None:
         msg = ""
 
     raise IntentionalPoolException(msg)
+
 
 class IntentionalPoolException(Exception):
     pass
@@ -79,7 +83,7 @@ def VerifyExceptionBehaviour(test, pool):
 
     test.assertTrue(ExceptionFound, "wait_return: No exception reported when raised in thread")
     ExceptionFound = False
-    
+
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         task.wait()
@@ -90,18 +94,19 @@ def VerifyExceptionBehaviour(test, pool):
 
     test.assertTrue(ExceptionFound, "wait: No exception reported when raised in thread")
     ExceptionFound = False
-    
+
     try:
         task = pool.add_task(exceptText, RaiseException, exceptText)
         pool.wait_completion()
-        
+
         task.wait()
     except IntentionalPoolException as e:
         print("Correctly found exception in thread\n" + str(e))
         ExceptionFound = True
         pass
 
-    test.assertTrue(ExceptionFound, "wait_completion: No exception reported when raised in thread and pool.wait_completion called")
+    test.assertTrue(ExceptionFound,
+                    "wait_completion: No exception reported when raised in thread and pool.wait_completion called")
 
 
 def SquareTheNumberWithDelay(num):
@@ -109,12 +114,13 @@ def SquareTheNumberWithDelay(num):
     SleepForRandomTime()
     return SquareTheNumber(num)
 
+
 def SquareTheNumber(num):
     '''Squares the number on a thread'''
     return num * num
 
-def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsInTest=100):
 
+def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsInTest=100):
     if Func is None:
         Func = SquareTheNumber
 
@@ -131,12 +137,13 @@ def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsIn
 
     for task in tasks:
         retval = task.wait_return()
-        self.assertEqual(ExpectedResults[task.expected_result_key], retval, "Returned value from function differs from expected value")
+        self.assertEqual(ExpectedResults[task.expected_result_key], retval,
+                         "Returned value from function differs from expected value")
 
     return
 
-def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
 
+def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
     if not numTasksInTest:
         numTasksInTest = multiprocessing.cpu_count() * 4
 
@@ -149,10 +156,9 @@ def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
 
     pid_collection = collections.Counter([p.wait_return() for p in tasks])
     self.assertTrue(len(pid_collection) == multiprocessing.cpu_count(), "All processes should have done work")
-    
+
 
 def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
-
     if CreateFunc is None:
         CreateFunc = CreateFile
 
@@ -176,7 +182,6 @@ def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTes
 
     Sum = 0
     for task in tasks:
-
         val = task.wait_return()
         self.assertEqual(val, int(task.name))
 
@@ -198,7 +203,7 @@ def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTes
 
         self.assertFalse(os.path.exists(filenamefullpath), "file undeleted after task reported complete")
 
-    time.sleep(0.5) #For some reason this test fails without a short delay
+    time.sleep(0.5)  # For some reason this test fails without a short delay
     num_files = len(os.listdir(self.TestOutputPath))
     self.assertEqual(0, num_files, "Found %d files in dir %s" % (num_files, self.TestOutputPath))
 
@@ -236,12 +241,11 @@ class PoolTestBase(unittest.TestCase):
 
 
 class TestThreadPoolBase(PoolTestBase):
-
     FilenameTemplate = "%04d.txt"
-
 
     # def runTest(self):
     #    self.skipTest("TestThreadPoolBase, no test implemented")
+
 
 class TestThreadPool(TestThreadPoolBase):
 
@@ -262,8 +266,8 @@ class TestThreadPool(TestThreadPoolBase):
         runFunctionOnPool(self, TPool)
         runFileIOOnPool(self, TPool)
 
-        #No need to test even distribution of work because the threads are all in the same process
-        #runEvenDistributionOfWorkTestOnThePool(self,TPool)
+        # No need to test even distribution of work because the threads are all in the same process
+        # runEvenDistributionOfWorkTestOnThePool(self,TPool)
 
         TPool = pools.GetThreadPool("Test local thread pool")
         self.assertIsNotNone(TPool)
@@ -288,7 +292,7 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
 
         runFunctionOnPool(self, TPool)
         runFileIOOnPool(self, TPool)
-        runEvenDistributionOfWorkTestOnThePool(self,TPool)
+        runEvenDistributionOfWorkTestOnThePool(self, TPool)
 
         TPool = pools.GetMultithreadingPool("Test multithreading pool")
         self.assertIsNotNone(TPool)
@@ -305,7 +309,7 @@ class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
 
         runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
         runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
-        runEvenDistributionOfWorkTestOnThePool(self,TPool)
+        runEvenDistributionOfWorkTestOnThePool(self, TPool)
 
 
 class TestThreadPoolWithRandomDelay(TestThreadPool):
@@ -318,8 +322,9 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
 
         runFunctionOnPool(self, TPool, Func=SquareTheNumberWithDelay)
         runFileIOOnPool(self, TPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
-        
-        #runEvenDistributionOfWorkTestOnThePool(self,TPool)
+
+        # runEvenDistributionOfWorkTestOnThePool(self,TPool)
+
 
 class TestProcessPool(unittest.TestCase):
 
@@ -338,7 +343,6 @@ class TestProcessPool(unittest.TestCase):
 
         Sum = 0
         for task in tasks:
-
             val = task.wait_return()
             intval = int(val)
             self.assertEqual(intval, int(task.name))
@@ -346,6 +350,7 @@ class TestProcessPool(unittest.TestCase):
             Sum = Sum + intval
 
         self.assertEqual(Sum, sum(range(1, numTasksInTest)), "Testing to ensure each number in test range was created")
+
 
 class TestClusterPoolFunctions(TestThreadPoolBase):
 
@@ -363,8 +368,8 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
         self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
         runFileIOOnPool(self, PPool, CreateFunc=CreateFileWithDelay, ReadFunc=ReadFileWithDelay)
         self.assertEqual(len(PPool._mtpool._active_tasks), 0, msg="Active tasks should be empty after subtest")
-        
-        runEvenDistributionOfWorkTestOnThePool(self,PPool)
+
+        runEvenDistributionOfWorkTestOnThePool(self, PPool)
 
         VerifyExceptionBehaviour(self, PPool)
 
@@ -399,6 +404,7 @@ class TestClusterPool(unittest.TestCase):
 
         self.assertEqual(Sum, sum(range(1, numTasksInTest)), "Testing to ensure each number in test range was created")
 
+
 # class TestParallelPythonProcessPool(unittest.TestCase):
 #
 #    def runTest(self):
@@ -429,5 +435,5 @@ class TestClusterPool(unittest.TestCase):
 
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
-    #multiprocessing.freeze_support()
+    # multiprocessing.freeze_support()
     unittest.main()

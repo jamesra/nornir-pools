@@ -72,33 +72,29 @@ loaded by the tasks.
 '''
 
 import atexit
-import os
-import sys
 import datetime
-import warnings
-import threading
-#import cProfile
-import pstats
 import glob
 import logging
-
+import os
+# import cProfile
+import pstats
+import sys
+import threading
+import warnings
 from typing import Callable
 
 import nornir_pools.ipool as ipool
-from nornir_pools.ipool import IPool
-import nornir_pools.poolbase as poolbase
-import nornir_pools.task as task
-from nornir_pools.task import Task
-
-import nornir_pools.processpool as processpool
-import nornir_pools.threadpool as threadpool
-import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
 import nornir_pools.local_machine_pool as local_machine_pool
+import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
+import nornir_pools.poolbase as poolbase
+import nornir_pools.processpool as processpool
 import nornir_pools.serialpool as serialpool
 import nornir_pools.shared_memory as shared_memory
-
+import nornir_pools.task as task
+import nornir_pools.threadpool as threadpool
+from nornir_pools.ipool import IPool
 from nornir_pools.shared_memory import get_or_create_shared_memory_manager
-
+from nornir_pools.task import Task
 from nornir_shared import prettyoutput
 
 __ParallelPythonAvailable = False
@@ -113,8 +109,10 @@ dictKnownPools = {}
 
 max_windows_threads = 61
 
-shared_lock = None #A multiprocessing.Lock that all child processes shared.
-                   # The lock can be accessed from multiprocessthreadpool from the parent process as well
+shared_lock = None  # A multiprocessing.Lock that all child processes shared.
+
+
+# The lock can be accessed from multiprocessthreadpool from the parent process as well
 
 def init_pool_process(the_lock):
     global shared_lock
@@ -360,7 +358,7 @@ def __EclipseConsoleWrite(s: str, newline: bool = False):
     sys.stdout.write(es)
 
 
-def __EclipseConsoleWriteError(s: str, newline:bool = False):
+def __EclipseConsoleWriteError(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
         es = es + '\n'
