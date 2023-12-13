@@ -63,10 +63,10 @@ class LocalMachinePool(poolbase.PoolBase):
 
         super(LocalMachinePool, self).__init__(*args, **kwargs)
 
-    def add_task(self, name, func, *args, **kwargs):
+    def add_task(self, name, func, *args, **kwargs) -> nornir_pools.task.Task:
         return self._multithreading_pool.add_task(name, func, *args, **kwargs)
 
-    def add_process(self, name, func, *args, **kwargs):
+    def add_process(self, name, func, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:
         return self._process_pool.add_process(name, func, *args, **kwargs)
 
     def wait_completion(self):

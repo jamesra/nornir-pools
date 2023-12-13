@@ -123,7 +123,7 @@ class NonDaemonPool(multiprocessing.pool.Pool):
         self.pool_name = str.format("pool-pid_{0}_instance_{1}", multiprocessing.current_process().pid,
                                     NonDaemonPool._instance_id)
 
-        NonDaemonPool._instance_id = NonDaemonPool._instance_id + 1
+        NonDaemonPool._instance_id += 1
 
         # Create a directory to store profile data for each subprocess
         if 'PROFILE' in os.environ:
@@ -225,7 +225,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         return self._lock
 
     @property
-    def num_active_tasks(self):
+    def num_active_tasks(self) -> int:
         return len(self._active_tasks)
 
     def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None,
@@ -279,7 +279,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
 
         return wrapper_function
 
-    def add_task(self, name: str, func: Callable, *args, **kwargs):
+    def add_task(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.Task:
 
         """Add a task to the queue"""
         if func is None:

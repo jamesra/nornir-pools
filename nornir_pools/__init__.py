@@ -353,7 +353,7 @@ def __CleanOutputForEclipse(s: str):
 def __EclipseConsoleWrite(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
-        es = es + '\n'
+        es += '\n'
 
     sys.stdout.write(es)
 
@@ -361,7 +361,7 @@ def __EclipseConsoleWrite(s: str, newline: bool = False):
 def __EclipseConsoleWriteError(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
-        es = es + '\n'
+        es += '\n'
 
     sys.stderr.write(es)
 
@@ -381,14 +381,14 @@ def __PrintProgressUpdateEclipse(s: str):
 
 def __ConsoleWrite(s: str, newline: bool = False):
     if newline:
-        s = s + '\n'
+        s += '\n'
 
     sys.stdout.write(s)
 
 
 def __ConsoleWriteError(s: str, newline: bool = False):
     if newline:
-        s = s + '\n'
+        s += '\n'
 
     sys.stderr.write(s)
 

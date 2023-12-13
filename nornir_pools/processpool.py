@@ -215,14 +215,14 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
         self._next_thread_id = 0
         # self.logger.warn("Creating Process Pool")
 
-    def add_worker_thread(self):
+    def add_worker_thread(self) -> Worker:
 
         w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
         w.name = "Process pool #%d" % self._next_thread_id
         self._next_thread_id += 1
         return w
 
-    def add_process(self, name: str, func: Callable[..., Any] | str, *args, **kwargs):
+    def add_process(self, name: str, func: Callable[..., Any] | str, *args, **kwargs) -> task.TaskWithEvent:
         """
         Add a task to the queue, args are passed directly to subprocess.Popen
         :param name: The name of the task

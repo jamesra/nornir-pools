@@ -29,7 +29,7 @@ class SerialPool(poolbase.PoolBase):
         return ["localhost"]
 
     @property
-    def num_active_tasks(self):
+    def num_active_tasks(self) -> int:
         return 1
 
     def __init__(self, num_threads, *args, **kwargs):
@@ -42,11 +42,11 @@ class SerialPool(poolbase.PoolBase):
         # self._name = pool_name
         super(SerialPool, self).__init__(*args, **kwargs)
 
-    def add_task(self, name: str, func: Callable, *args, **kwargs):
+    def add_task(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.Task:
         retval = func(*args, **kwargs)
         return nornir_pools.task.SerialTask(name, retval, *args, **kwargs)
 
-    def add_process(self, name: str, func: Callable, *args, **kwargs):
+    def add_process(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:
         SingleParameterProc = subprocess.Popen(func + " && exit", shell=True, stdout=subprocess.PIPE,
                                                stderr=subprocess.PIPE)
 

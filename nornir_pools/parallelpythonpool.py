@@ -24,7 +24,7 @@ def IncrementActiveJobCount():
     # global JobCountLock
     global ActiveJobCount
     # JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount + 1
+    ActiveJobCount += 1
     # JobCountLock.release()
 
 
@@ -32,7 +32,7 @@ def DecrementActiveJobCount():
     # global JobCountLock
     global ActiveJobCount
     # JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount - 1
+    ActiveJobCount -= 1
     # JobCountLock.release()
 
 
@@ -211,7 +211,7 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         return self._server
 
     def __init__(self, num_threads=None):
-
+        super(poolbase.PoolBase, self).__init__()
         self._server = None
 
     #

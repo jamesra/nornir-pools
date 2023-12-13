@@ -347,7 +347,7 @@ class TestProcessPool(unittest.TestCase):
             intval = int(val)
             self.assertEqual(intval, int(task.name))
 
-            Sum = Sum + intval
+            Sum += intval
 
         self.assertEqual(Sum, sum(range(1, numTasksInTest)), "Testing to ensure each number in test range was created")
 
@@ -400,7 +400,7 @@ class TestClusterPool(unittest.TestCase):
             intval = int(val)
             self.assertEqual(intval, int(task.name))
 
-            Sum = Sum + intval
+            Sum += intval
 
         self.assertEqual(Sum, sum(range(1, numTasksInTest)), "Testing to ensure each number in test range was created")
 
