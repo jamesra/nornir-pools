@@ -4,10 +4,10 @@ Created on Aug 30, 2013
 @author: u0490822
 '''
 
-from ez_setup import use_setuptools
+# from ez_setup import use_setuptools
 
 if __name__ == '__main__':
-    use_setuptools()
+    # use_setuptools()
 
     from setuptools import setup, find_packages
 
