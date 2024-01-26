@@ -1,3 +1,4 @@
 six
 nose
+numpy>=1.9.1
 nornir_shared @ git+https://github.com/jamesra/nornir-shared#egg=nornir_shared-1.4.1
