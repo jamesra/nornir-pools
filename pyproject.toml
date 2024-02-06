@@ -23,7 +23,7 @@ dependencies = [
 	"six",
   "numpy",
   "matplotlib",
-  "nornir_shared @ git+https://github.com/nornir/nornir-shared@dev#egg=nornir_shared-1.5.0",
+  "nornir_shared @ git+https://github.com/jamesra/nornir-shared@dev#egg=nornir_shared-1.5.0",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.9",
