@@ -22,9 +22,12 @@ from . import task
 
 class ImmediateProcessTask(task.TaskWithEvent):
     '''Launches processes without threads'''
+    exception: Exception | None # Exception thrown by the process
+    
 
     def __init__(self, name: str, func: str, *args, **kwargs):
         super(ImmediateProcessTask, self).__init__(name, *args, **kwargs)
+        self.exception = None
         self.proc = None  # type: subprocess.Popen | None
         self.cmd = func  # type: str
         self.returned_value = None  # type: Any
@@ -43,7 +46,7 @@ class ImmediateProcessTask(task.TaskWithEvent):
         self.returned_value = self.proc.communicate()
         self._handle_proc_completion()
 
-        if hasattr(self, 'exception'):
+        if self.exception is not None:
             raise self.exception
         elif self.returncode < 0:
             raise Exception("Negative return code from task but no exception detail provided")
