@@ -8,7 +8,7 @@ where = ["nornir_pools"]
 
 [project]
 name = "nornir_pools"
-version = "1.5.1.dev2"
+version = "1.5.1-dev2"
 authors = [
   { name="James Anderson", email="James.R.Anderson@utah.edu" },
 ]
