@@ -20,7 +20,7 @@ readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.9"
 dependencies = [
-	"six",
+  "six",
   "numpy",
   "matplotlib",
   "nornir_shared @ git+https://github.com/clementsan/nornir-shared@dev#egg=nornir_shared-1.5.1",
