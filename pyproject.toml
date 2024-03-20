@@ -5,7 +5,6 @@ build-backend = 'setuptools.build_meta'
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nornir_pools"]
-# namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
 [project]
 name = "nornir_pools"
@@ -19,7 +18,7 @@ maintainers = [
 description = "A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "six >= 1.16",
   "numpy >= 1.26",
@@ -27,7 +26,7 @@ dependencies = [
   "nornir_shared @ git+https://github.com/clementsan/nornir-shared.git@dev",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
 ]
