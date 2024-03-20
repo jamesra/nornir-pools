@@ -3,8 +3,8 @@ requires = ["setuptools >= 61.0"]
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools.packages.find]
-where = ["nornir_pools"]
-
+where = ["."]
+include = ["nornir_pools"]
 
 [project]
 name = "nornir_pools"
