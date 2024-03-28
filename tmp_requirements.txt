@@ -1,4 +1,0 @@
-six
-nose
-numpy
-matplotlib
