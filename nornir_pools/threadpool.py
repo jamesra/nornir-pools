@@ -22,6 +22,9 @@ from nornir_shared import prettyoutput
 
 
 class ThreadTask(task.TaskWithEvent):
+    _exception: Exception | None = None
+    _returned_value: int | None = None
+    func: Callable
 
     @property
     def exception(self) -> Exception:
@@ -85,7 +88,7 @@ class Worker(threading.Thread):
         self.start()
 
     @staticmethod
-    def generate_elapsed_time_str(task_name, t_delta):
+    def generate_elapsed_time_str(task_name: str, t_delta: float):
         '''Generate a string describing how long a task took to complete'''
         time_position = 70
 
@@ -185,14 +188,15 @@ class Worker(threading.Thread):
 class ThreadPool(poolbase.LocalThreadPoolBase):
     """Pool of threads consuming tasks from a queue"""
 
-    def add_process(self, name, func, *args, **kwargs):
+    def add_process(self, name: str, func: Callable, *args, **kwargs):
         raise NotImplemented()
 
     # How often workers check for new jobs in the queue
 
     def __init__(self,
                  num_threads: int | None = None,
-                 WorkerCheckInterval=None, *args, **kwargs):
+                 WorkerCheckInterval: float | None = None,
+                 *args, **kwargs):
         '''
         :param int num_threads: Maximum number of threads in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
@@ -216,7 +220,7 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         self._next_thread_id += 1
         return w
 
-    def add_task(self, name, func, *args, **kwargs) -> ThreadTask:
+    def add_task(self, name: str, func: Callable, *args, **kwargs) -> ThreadTask:
 
         if func is None:
             prettyoutput.LogErr("Thread pool add task {0} called with 'None' as function".format(name))
