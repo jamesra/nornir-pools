@@ -12,9 +12,6 @@ version = "1.5.1"
 authors = [
   { name="James Anderson", email="James.R.Anderson@utah.edu" },
 ]
-maintainers = [
-  { name="Clement Vachet", email="cvachet@sci.utah.edu" },
-]
 description = "A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface"
 readme = "README.md"
 license = {file = "LICENSE"}
