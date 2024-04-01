@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nornir_pools"]
+
+[project]
+name = "nornir_pools"
+version = "1.5.0"
+authors = [
+  { name="James Anderson", email="James.R.Anderson@utah.edu" },
+]
+description = "A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.7"
+dependencies = [
+	"six",
+  "numpy",
+  "matplotlib",
+  "nornir_shared @ git+https://github.com/jamesra/nornir-shared#egg=nornir_shared-1.4.1",
+]
+classifiers = [
+    "Programming Language :: Python :: 3.7",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+test = ["nose"]
+
+[project.urls]
+Homepage = "https://github.com/jamesra/nornir-pools"
+Issues = "https://github.com/jamesra/nornir-pools/issues"
