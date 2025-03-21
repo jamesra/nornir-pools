@@ -23,7 +23,10 @@ from nornir_shared import prettyoutput
 _profiler = None  # type: None | cProfile.Profile
 
 
-def _poolinit(profile_dir=None):
+def _poolinit(profile_dir: str | None = None,
+              initializer: Callable | None = None,
+              intitializer_args: list | None = None,
+              initializer_kwargs: dict | None = None):
     global _profiler
     _profiler = None
 
@@ -34,8 +37,15 @@ def _poolinit(profile_dir=None):
 
         atexit.register(_processfinalizer, profile_dir)
 
+    if initializer is not None:
+        if intitializer_args is None:
+            intitializer_args = []
+        if initializer_kwargs is None:
+            initializer_kwargs = {}
+        initializer(*intitializer_args, **initializer_kwargs)
 
-def _processfinalizer(profile_dir):
+
+def _processfinalizer(profile_dir: str):
     global _profiler
     if _profiler is not None:
         _profiler.disable()
@@ -111,10 +121,15 @@ class NonDaemonPool(multiprocessing.pool.Pool):
     @classmethod
     def _get_root_profile_output_path(cls):
         if cls._root_profile_output_dir is None:
-            if os.path.isdir(os.environ['PROFILE']):
-                cls._root_profile_output_dir = os.environ['PROFILE']
-            else:
-                cls._root_profile_output_dir = tempfile.mkdtemp()
+            if 'PROFILE_PATH' in os.environ:
+                try:
+                    cls._root_profile_output_dir = os.environ['PROFILE_PATH']
+                    os.makedirs(cls._root_profile_output_dir, exist_ok=True)
+
+                except IOError:
+                    cls._root_profile_output_dir = tempfile.mkdtemp()
+                    prettyoutput.Log(f'Profiling data saved to: {cls._root_profile_output_dir}')
+                    pass
 
         return cls._root_profile_output_dir
 
@@ -130,13 +145,15 @@ class NonDaemonPool(multiprocessing.pool.Pool):
             root_output_dir = NonDaemonPool._get_root_profile_output_path()
             self.profile_dir = os.path.join(root_output_dir, self.pool_name)
 
-            os.makedirs(self.profile_dir, exist_ok=True)
-
             atexit.register(nornir_pools.MergeProfilerStats, root_output_dir, self.profile_dir, self.pool_name)
-            assert ('initializer' not in kwargs)
+
+            if 'initializer' in kwargs:
+                # assert ('initializer' not in kwargs)
+                kwargs['initargs'] = [self.profile_dir, kwargs['initializer'], kwargs['initargs']]
+            else:
+                kwargs['initargs'] = [self.profile_dir]
 
             kwargs['initializer'] = _poolinit
-            kwargs['initargs'] = [self.profile_dir]
 
         super(NonDaemonPool, self).__init__(*args, **kwargs)
 
