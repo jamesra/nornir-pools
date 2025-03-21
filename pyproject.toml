@@ -10,17 +10,17 @@ include = ["nornir_pools"]
 name = "nornir_pools"
 version = "1.5.1"
 authors = [
-  { name="James Anderson", email="James.R.Anderson@utah.edu" },
+    { name = "James Anderson", email = "James.R.Anderson@utah.edu" },
 ]
 description = "A helper library that wraps python threads, multiprocessing, a process pool for shell commands, and parallel python with the same interface"
 readme = "README.md"
-license = {file = "LICENSE"}
-requires-python = ">=3.10"
+license = { file = "LICENSE" }
+requires-python = ">=3.13"
 dependencies = [
-  "six >= 1.16",
-  "numpy >= 1.26",
-  "matplotlib >= 3.8",
-  "nornir_shared @ git+https://github.com/jamesra/nornir-shared.git@dev",
+    "six >= 1.16",
+    "numpy >= 1.26",
+    "matplotlib >= 3.8",
+    "nornir_shared @ git+https://github.com/jamesra/nornir-shared.git@dev",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.10",
