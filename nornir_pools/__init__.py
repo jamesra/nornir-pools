@@ -111,6 +111,8 @@ max_windows_threads = 61
 
 shared_lock = None  # A multiprocessing.Lock that all child processes shared.
 
+__thread_limit_warning_shown = False
+
 
 # The lock can be accessed from multiprocessthreadpool from the parent process as well
 
@@ -141,7 +143,11 @@ def ApplyOSThreadLimit(num_threads):
     if os.name == 'nt':
         if num_threads > max_windows_threads:
             num_threads = max_windows_threads
-            prettyoutput.Log(f"Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+
+            global __thread_limit_warning_shown
+            if not __thread_limit_warning_shown:
+                prettyoutput.Log(f"Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+                __thread_limit_warning_shown = True
             # Limit the maximum number of threads to 63 due to Windows limit
             # to waitall
             # https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
