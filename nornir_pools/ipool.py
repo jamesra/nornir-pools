@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Any
 
+from nornir_pools.task import Task, TaskWithEvent
 
 class IPool(ABC):
 
@@ -29,7 +30,7 @@ class IPool(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add_task(self, name: str, func: Callable[..., Any], *args, **kwargs):
+    def add_task(self, name: str, func: Callable[..., Any], *args, **kwargs) -> Task:
         '''
         Call a python function on the pool
 
@@ -42,7 +43,7 @@ class IPool(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add_process(self, name: str, func: Callable[..., Any], *args, **kwargs):
+    def add_process(self, name: str, func: Callable[..., Any], *args, **kwargs) -> TaskWithEvent:
         '''
         Invoke a process on the pool.  This function creates a task using name and then invokes pythons subprocess
 

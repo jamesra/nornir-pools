@@ -1,4 +1,4 @@
-''' 
+"""
 
 nornir_pools aims to provide a consistent interface around four different multi-threading and clustering libraries
 available to Python.
@@ -12,22 +12,22 @@ The use pattern for pools is:
 
 Steps 3 and 4 can be skipped if output is not required.  In this case wait_completion can be called on the pool to
 delay until all tasks have completed.  Note that in this pattern exceptions may be lost.
- 
+
 Pool Creation
 -------------
 
 Pool creation functions share a common signature
 
 .. py:function:: Get<X>Pool([Poolname=None, num_threads=None)
-   
+
    Return a pool of X type, listed below.  Repeated calls using the same name returns the same pool
-    
+
    :param str Poolname: Name of the pool to get or create.  Passing "None" returns the global pool
    :param int num_threads: Number of tasks allowed to execute concurrently.  Not honored by all pools at this time
-   
+
    :returns: object derived from PoolBase
    :rtype: PoolBase
-    
+
 .. autofunction:: GetThreadPool
 .. autofunction:: GetMultithreadingPool
 .. autofunction:: GetProcessPool
@@ -43,12 +43,12 @@ Most callers will not care about getting a specific pool.  These functions alway
 .. autofunction:: GetGlobalProcessPool
 .. autofunction:: GetGlobalClusterPool
 
- 
+
 Pool Objects
 ------------
 .. automodule:: nornir_pools.poolbase
    :members:
-   
+
 Task Objects
 ------------
 .. autoclass:: nornir_pools.task.Task
@@ -69,33 +69,33 @@ On windows there is significant overhead to passing parameters to multiprocessin
 pickle overrides to objects being marshalled.  I also removed as many global initializations as I could from modules
 loaded by the tasks.
 
-'''
+"""
 
 import atexit
-import os
-import sys
 import datetime
-import warnings
-import threading
-#import cProfile
-import pstats
 import glob
 import logging
-
+import os
+# import cProfile
+import pstats
+import sys
+import threading
+import warnings
+import platform
 from typing import Callable
 
 import nornir_pools.ipool as ipool
-from nornir_pools.ipool import IPool
-import nornir_pools.poolbase as poolbase
-import nornir_pools.task as task
-from nornir_pools.task import Task
-
-import nornir_pools.processpool as processpool
-import nornir_pools.threadpool as threadpool
-import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
 import nornir_pools.local_machine_pool as local_machine_pool
+import nornir_pools.multiprocessthreadpool as multiprocessthreadpool
+import nornir_pools.poolbase as poolbase
+import nornir_pools.processpool as processpool
 import nornir_pools.serialpool as serialpool
-
+import nornir_pools.shared_memory as shared_memory
+import nornir_pools.task as task
+import nornir_pools.threadpool as threadpool
+from nornir_pools.ipool import IPool
+from nornir_pools.shared_memory import get_or_create_shared_memory_manager
+from nornir_pools.task import Task
 from nornir_shared import prettyoutput
 
 __ParallelPythonAvailable = False
@@ -108,7 +108,18 @@ except ImportError as e:
 
 dictKnownPools = {}
 
-max_windows_threads = 61
+max_windows_threads = 1024
+
+shared_lock = None  # A multiprocessing.Lock that all child processes shared.
+
+__thread_limit_warning_shown = False
+
+
+# The lock can be accessed from multiprocessthreadpool from the parent process as well
+
+def init_pool_process(the_lock):
+    global shared_lock
+    shared_lock = the_lock
 
 
 def ApplyOSThreadLimit(num_threads):
@@ -131,9 +142,17 @@ def ApplyOSThreadLimit(num_threads):
         num_threads = min(environ_max_threads, num_threads)
 
     if os.name == 'nt':
-        if num_threads > max_windows_threads:
+        release = platform.release()
+
+        if release.startswith('11'):
+            return num_threads  # There is no limit on Windows 11 on Python 13 and later (May have taken effect earlier, but this is close and earlier versions are untested)
+        elif num_threads > max_windows_threads:
             num_threads = max_windows_threads
-            prettyoutput.Log(f"Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+
+            global __thread_limit_warning_shown
+            if not __thread_limit_warning_shown:
+                prettyoutput.Log(f"Number of threads in pool limited to windows handle limit of {max_windows_threads}")
+                __thread_limit_warning_shown = True
             # Limit the maximum number of threads to 63 due to Windows limit
             # to waitall
             # https://stackoverflow.com/questions/65252807/multiprocessing-pool-pool-on-windows-cpu-limit-of-63
@@ -187,7 +206,7 @@ def WaitOnAllPools():
 
 
 def _remove_pool(p: str | IPool):
-    '''Called from pool shutdown implementations to remove the pool from the map of existing pools'''
+    """Called from pool shutdown implementations to remove the pool from the map of existing pools"""
     global dictKnownPools
     global __pool_management_lock
 
@@ -202,10 +221,10 @@ def _remove_pool(p: str | IPool):
 
 @atexit.register
 def ClosePools():
-    '''
+    """
     Shutdown all pools.
 
-    '''
+    """
     global dictKnownPools
     global profiler
     global __pool_management_lock
@@ -239,9 +258,9 @@ def ClosePools():
 
 
 def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
-    '''
-    Get or create a specific thread pool using vanilla python threads    
-    '''
+    """
+    Get or create a specific thread pool using vanilla python threads
+    """
     return __CreatePool(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
 
 
@@ -250,63 +269,63 @@ def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = N
 
 
 def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
-    '''Get or create a specific thread pool to execute threads in other processes on the same computer using the
-    multiprocessing library '''
-    warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
+    """Get or create a specific thread pool to execute threads in other processes on the same computer using the
+    multiprocessing library """
+    # warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
     return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
 
 
 def GetProcessPool(Poolname: str | None = None, num_threads: int | None = None) -> processpool.ProcessPool:
-    '''Get or create a specific pool to invoke shell command processes on the same computer using the subprocess
-    module '''
-    warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
+    """Get or create a specific pool to invoke shell command processes on the same computer using the subprocess
+    module """
+    # warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
     return __CreatePool(nornir_pools.processpool.ProcessPool, Poolname, num_threads)
 
 
 def GetParallelPythonPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
-    '''Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel
-    python '''
+    """Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel
+    python """
     return __CreatePool(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
 def GetSerialPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
-    '''
-    Get or create a specific thread pool using vanilla python threads    
-    '''
+    """
+    Get or create a specific thread pool using vanilla python threads
+    """
     if Poolname is None:
         raise ValueError("Must supply a pool name")
     return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
 
 
 def GetGlobalSerialPool() -> IPool:
-    '''
+    """
     Common pool for processes on the local machine
-    '''
+    """
     return GetSerialPool(Poolname="Global")
     # return GetProcessPool("Global local process pool")
 
 
 def GetGlobalProcessPool() -> processpool.ProcessPool:
-    '''
+    """
     Common pool for processes on the local machine
-    '''
+    """
     return GetProcessPool(Poolname="Global process pool")
     # return GetProcessPool("Global local process pool")
 
 
 def GetGlobalLocalMachinePool() -> IPool:
-    '''
+    """
     Common pool for launching other processes for threads or executables.  Combines multithreading and process pool
     interface.
-    '''
+    """
 
     return GetLocalMachinePool(Poolname="Global local machine pool", is_global=True)
 
 
 def GetGlobalClusterPool() -> IPool:
-    '''
+    """
     Get the common pool for placing tasks on the cluster
-    '''
+    """
     if not __ParallelPythonAvailable:
         return GetGlobalLocalMachinePool()
         # raise Exception("Parallel python is not available")
@@ -315,17 +334,17 @@ def GetGlobalClusterPool() -> IPool:
 
 
 def GetGlobalThreadPool() -> IPool:
-    '''
+    """
     Common pool for thread based tasks
-    '''
+    """
     return GetThreadPool("Global local thread pool")
 
 
 def GetGlobalMultithreadingPool() -> IPool:
-    '''
+    """
     Common pool for multithreading module tasks, threads run in different python processes to work around the global
     interpreter lock
-    '''
+    """
     # return GetGlobalLocalMachinePool()
     return GetMultithreadingPool("Global multithreading pool")
 
@@ -345,15 +364,15 @@ def __CleanOutputForEclipse(s: str):
 def __EclipseConsoleWrite(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
-        es = es + '\n'
+        es += '\n'
 
     sys.stdout.write(es)
 
 
-def __EclipseConsoleWriteError(s: str, newline:bool = False):
+def __EclipseConsoleWriteError(s: str, newline: bool = False):
     es = __CleanOutputForEclipse(s)
     if newline:
-        es = es + '\n'
+        es += '\n'
 
     sys.stderr.write(es)
 
@@ -373,14 +392,14 @@ def __PrintProgressUpdateEclipse(s: str):
 
 def __ConsoleWrite(s: str, newline: bool = False):
     if newline:
-        s = s + '\n'
+        s += '\n'
 
     sys.stdout.write(s)
 
 
 def __ConsoleWriteError(s: str, newline: bool = False):
     if newline:
-        s = s + '\n'
+        s += '\n'
 
     sys.stderr.write(s)
 
@@ -522,7 +541,7 @@ def aggregate_profiler_data(output_path):
 
 
 def MergeProfilerStats(root_output_dir: str, profile_dir: str, pool_name: str):
-    '''Called by atexit.  Merges all *.profile files in the profile_dir into a single .profile file'''
+    """Called by atexit.  Merges all *.profile files in the profile_dir into a single .profile file"""
     profile_files = glob.glob(os.path.join(profile_dir, "**", "*.pstats"), recursive=True)
 
     if len(profile_files) == 0:

@@ -5,17 +5,16 @@
 # Made prettier by James Tucker
 
 import atexit
+import cProfile
+import logging
 import multiprocessing
+import multiprocessing.pool
+import os
 import tempfile
 from typing import *
-import multiprocessing.pool
-import logging
-import nornir_pools.task
 
 import nornir_pools
-
-import cProfile
-import os
+import nornir_pools.task
 # import time
 from nornir_shared import prettyoutput
 
@@ -24,7 +23,10 @@ from nornir_shared import prettyoutput
 _profiler = None  # type: None | cProfile.Profile
 
 
-def _poolinit(profile_dir=None):
+def _poolinit(profile_dir: str | None = None,
+              initializer: Callable | None = None,
+              intitializer_args: list | None = None,
+              initializer_kwargs: dict | None = None):
     global _profiler
     _profiler = None
 
@@ -35,8 +37,15 @@ def _poolinit(profile_dir=None):
 
         atexit.register(_processfinalizer, profile_dir)
 
+    if initializer is not None:
+        if intitializer_args is None:
+            intitializer_args = []
+        if initializer_kwargs is None:
+            initializer_kwargs = {}
+        initializer(*intitializer_args, **initializer_kwargs)
 
-def _processfinalizer(profile_dir):
+
+def _processfinalizer(profile_dir: str):
     global _profiler
     if _profiler is not None:
         _profiler.disable()
@@ -112,10 +121,15 @@ class NonDaemonPool(multiprocessing.pool.Pool):
     @classmethod
     def _get_root_profile_output_path(cls):
         if cls._root_profile_output_dir is None:
-            if os.path.isdir(os.environ['PROFILE']):
-                cls._root_profile_output_dir = os.environ['PROFILE']
-            else:
-                cls._root_profile_output_dir = tempfile.mkdtemp()
+            if 'PROFILE_PATH' in os.environ:
+                try:
+                    cls._root_profile_output_dir = os.environ['PROFILE_PATH']
+                    os.makedirs(cls._root_profile_output_dir, exist_ok=True)
+
+                except IOError:
+                    cls._root_profile_output_dir = tempfile.mkdtemp()
+                    prettyoutput.Log(f'Profiling data saved to: {cls._root_profile_output_dir}')
+                    pass
 
         return cls._root_profile_output_dir
 
@@ -124,20 +138,22 @@ class NonDaemonPool(multiprocessing.pool.Pool):
         self.pool_name = str.format("pool-pid_{0}_instance_{1}", multiprocessing.current_process().pid,
                                     NonDaemonPool._instance_id)
 
-        NonDaemonPool._instance_id = NonDaemonPool._instance_id + 1
+        NonDaemonPool._instance_id += 1
 
         # Create a directory to store profile data for each subprocess
         if 'PROFILE' in os.environ:
             root_output_dir = NonDaemonPool._get_root_profile_output_path()
             self.profile_dir = os.path.join(root_output_dir, self.pool_name)
 
-            os.makedirs(self.profile_dir, exist_ok=True)
-
             atexit.register(nornir_pools.MergeProfilerStats, root_output_dir, self.profile_dir, self.pool_name)
-            assert ('initializer' not in kwargs)
+
+            if 'initializer' in kwargs:
+                # assert ('initializer' not in kwargs)
+                kwargs['initargs'] = [self.profile_dir, kwargs['initializer'], kwargs['initargs']]
+            else:
+                kwargs['initargs'] = [self.profile_dir]
 
             kwargs['initializer'] = _poolinit
-            kwargs['initargs'] = [self.profile_dir]
 
         super(NonDaemonPool, self).__init__(*args, **kwargs)
 
@@ -215,16 +231,25 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     @property
     def tasks(self):
         if self._tasks is None:
-            self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes)
+            self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes,
+                                        initializer=nornir_pools.init_pool_process, initargs=(self._lock,))
 
         return self._tasks
 
     @property
-    def num_active_tasks(self):
+    def lock(self):
+        '''A lock that is shared among all child processes'''
+        return self._lock
+
+    @property
+    def num_active_tasks(self) -> int:
         return len(self._active_tasks)
 
-    def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None, *args, **kwargs):
+    def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None,
+                 authkey: bytes | None = None,
+                 *args, **kwargs):
         self._tasks = None
+        self._lock = multiprocessing.Lock()
 
         num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
 
@@ -232,6 +257,9 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         self._maxtasksperchild = maxtasksperchild
         # A list of incomplete AsyncResults
         self._active_tasks = {}  # type : Dict[int, MultiprocessThreadTask]
+
+        # self.authkey = multiprocessing.current_process().authkey if authkey is None else authkey
+        # self._shared_memory_manager = nornir_pools.get_or_create_shared_memory_manager(self.authkey)
 
         super(MultiprocessThreadPool, self).__init__(*args, **kwargs)
 
@@ -268,7 +296,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
 
         return wrapper_function
 
-    def add_task(self, name: str, func: Callable, *args, **kwargs):
+    def add_task(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.Task:
 
         """Add a task to the queue"""
         if func is None:

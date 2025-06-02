@@ -4,26 +4,27 @@
 # Made awesomer by James Anderson
 # Made prettier by James Tucker
 
+# from threading import Lock
+import socket
+import subprocess
 import sys
 import time
 import traceback
-import subprocess
-# from threading import Lock
-import socket
-from . import task
 
 import nornir_pools
 from . import poolbase
+from . import task
 
 NextGroupName = 0
 # JobCountLock = Lock()
 ActiveJobCount = 0
 
+
 def IncrementActiveJobCount():
     # global JobCountLock
     global ActiveJobCount
     # JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount + 1
+    ActiveJobCount += 1
     # JobCountLock.release()
 
 
@@ -31,7 +32,7 @@ def DecrementActiveJobCount():
     # global JobCountLock
     global ActiveJobCount
     # JobCountLock.acquire(True)
-    ActiveJobCount = ActiveJobCount - 1
+    ActiveJobCount -= 1
     # JobCountLock.release()
 
 
@@ -62,9 +63,9 @@ class CTask(task.TaskWithEvent):
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
 
-        assert(len(args) > 0)
+        assert (len(args) > 0)
         if not args[0] is None:
-            assert(isinstance(args[0], dict))
+            assert (isinstance(args[0], dict))
             self.__dict__.update(args[0])
 
         if 'error_message' in self.__dict__:
@@ -78,7 +79,6 @@ class CTask(task.TaskWithEvent):
 
         self.completed.set()
 
-
     def wait(self):
         self.server.wait(self.groupname)
 
@@ -86,8 +86,10 @@ class CTask(task.TaskWithEvent):
         self.completed.wait(300)
 
         if not self._callback_reached:
-            nornir_pools._PrintWarning("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
-            nornir_pools._PrintWarning("We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
+            nornir_pools._PrintWarning(
+                "Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
+            nornir_pools._PrintWarning(
+                "We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
             self.completed.wait()
             # raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             self.completed.set()
@@ -118,11 +120,10 @@ class CTask(task.TaskWithEvent):
 
 
 def RemoteWorkerProcess(cmd, fargs):
-
     entry = {}
 
     try:
-        entry = {'type' : 'RemoteWorkerProcess'}
+        entry = {'type': 'RemoteWorkerProcess'}
         args = fargs[0]
         kwargs = fargs[1]
 
@@ -158,11 +159,10 @@ def RemoteWorkerProcess(cmd, fargs):
 
 
 def RemoteFunction(func, fargs):
-
     entry = {}
 
     try:
-        entry = {'type' : 'RemoteFunction'}
+        entry = {'type': 'RemoteFunction'}
 
         args = fargs[0]
         kwargs = fargs[1]
@@ -197,7 +197,6 @@ def RemoteFunction(func, fargs):
 
 
 class ParallelPythonProcess_Pool(poolbase.PoolBase):
-
     """Pool of threads consuming tasks from a queue"""
 
     @property
@@ -212,21 +211,22 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         return self._server
 
     def __init__(self, num_threads=None):
-
+        super(poolbase.PoolBase, self).__init__()
         self._server = None
-#
-#         self.server = pp.Server(ppservers = ("*",))
-#
-#
-#         self.server.print_stats()
 
-#     def __del__(self):
-#
-#         if not self.server is None:
-#             self.server.wait()
-#             self.server.print_stats()
-#             self.server.destroy()
-#             self.server = None
+    #
+    #         self.server = pp.Server(ppservers = ("*",))
+    #
+    #
+    #         self.server.print_stats()
+
+    #     def __del__(self):
+    #
+    #         if not self.server is None:
+    #             self.server.wait()
+    #             self.server.print_stats()
+    #             self.server.destroy()
+    #             self.server = None
 
     def shutdown(self):
 
@@ -257,7 +257,9 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         IncrementActiveJobCount()
 
         taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
-        ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('socket', 'traceback', 'subprocess', 'sys'))
+        ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback,
+                                    globals=globals(), group=str(NextGroupName),
+                                    modules=('socket', 'traceback', 'subprocess', 'sys'))
         taskObj.ppTask = ppTask
 
         NextGroupName += 1
@@ -282,7 +284,9 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         kwargs['shell'] = True
 
         taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
-        ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback, globals=globals(), group=str(NextGroupName), modules=('socket', 'traceback', 'subprocess', 'sys'))
+        ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback,
+                                    globals=globals(), group=str(NextGroupName),
+                                    modules=('socket', 'traceback', 'subprocess', 'sys'))
         taskObj.ppTask = ppTask
 
         NextGroupName += 1
