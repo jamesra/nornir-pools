@@ -81,6 +81,7 @@ import pstats
 import sys
 import threading
 import warnings
+import platform
 from typing import Callable
 
 import nornir_pools.ipool as ipool
@@ -107,7 +108,7 @@ except ImportError as e:
 
 dictKnownPools = {}
 
-max_windows_threads = 61
+max_windows_threads = 1024
 
 shared_lock = None  # A multiprocessing.Lock that all child processes shared.
 
@@ -141,7 +142,11 @@ def ApplyOSThreadLimit(num_threads):
         num_threads = min(environ_max_threads, num_threads)
 
     if os.name == 'nt':
-        if num_threads > max_windows_threads:
+        release = platform.release()
+
+        if release.startswith('11'):
+            return num_threads  # There is no limit on Windows 11 on Python 13 and later (May have taken effect earlier, but this is close and earlier versions are untested)
+        elif num_threads > max_windows_threads:
             num_threads = max_windows_threads
 
             global __thread_limit_warning_shown
