@@ -3,7 +3,7 @@ import multiprocessing
 import os
 from multiprocessing.managers import SharedMemoryManager
 
-_shared_memory_manager = None  # type: SharedMemoryManager
+_shared_memory_manager: SharedMemoryManager | None = None
 
 
 def _stop_shared_memory_manager():
@@ -28,14 +28,16 @@ def get_or_create_shared_memory_manager(authkey: bytes | None = None):
             _shared_memory_manager = SharedMemoryManager(address=address, authkey=authkey)
             _shared_memory_manager.connect()
         else:
-            _shared_memory_authkey = multiprocessing.current_process().authkey if authkey is None else authkey
+            _authkey = authkey if authkey is not None else multiprocessing.current_process().authkey
 
             if _shared_memory_manager is None:
-                _shared_memory_manager = SharedMemoryManager(authkey=authkey)
+                _shared_memory_manager = SharedMemoryManager(authkey=_authkey)
                 _shared_memory_manager.start()
-                print(f"Creating shared memory manager: {_shared_memory_manager.address}")
+                _addr = _shared_memory_manager.address
+                assert _addr is not None and _authkey is not None
+                print(f"Creating shared memory manager: {_addr}")
                 atexit.register(_stop_shared_memory_manager)
-                os.environ['SHARED_MEMORY_SERVER_ADDRESS'] = _shared_memory_manager.address
-                os.environ['SHARED_MEMORY_AUTHKEY'] = authkey.hex()
+                os.environ['SHARED_MEMORY_SERVER_ADDRESS'] = str(_addr)
+                os.environ['SHARED_MEMORY_AUTHKEY'] = _authkey.hex()
 
     return _shared_memory_manager

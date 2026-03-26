@@ -43,7 +43,7 @@ class IPool(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add_process(self, name: str, func: Callable[..., Any], *args, **kwargs) -> TaskWithEvent:
+    def add_process(self, name: str, func: Callable[..., Any] | str, *args, **kwargs) -> TaskWithEvent:
         '''
         Invoke a process on the pool.  This function creates a task using name and then invokes pythons subprocess
 

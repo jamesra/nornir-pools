@@ -82,7 +82,7 @@ import sys
 import threading
 import warnings
 import platform
-from typing import Callable
+from typing import ParamSpec, Protocol
 
 import nornir_pools.ipool as ipool
 import nornir_pools.local_machine_pool as local_machine_pool
@@ -122,7 +122,7 @@ def init_pool_process(the_lock):
     shared_lock = the_lock
 
 
-def ApplyOSThreadLimit(num_threads):
+def ApplyOSThreadLimit(num_threads: int):
     """
     :return The minimum of the maximum number of threads on the OS, the 
     MAX_PYTHON_THREADS environment variable, or the requested num_threads
@@ -161,29 +161,32 @@ def ApplyOSThreadLimit(num_threads):
 
 
 __pool_management_lock = threading.RLock()
+_PoolFactoryParams = ParamSpec("_PoolFactoryParams")
 
 
-def __CreatePool(poolclass: Callable[[int, list | None, dict | None], IPool],
-                 Poolname: str | None = None,
-                 num_threads: int | None = None,
-                 *args, **kwargs) -> IPool:
+class PoolFactory(Protocol[_PoolFactoryParams]):
+    def __call__(self, name: str, num_workers: int | None = None, /, *args: _PoolFactoryParams.args,
+                 **kwargs: _PoolFactoryParams.kwargs) -> IPool:
+        ...
+
+
+def __CreatePoolFromFactory(pool_factory: PoolFactory[_PoolFactoryParams],
+                            Poolname: str,
+                            num_workers: int | None = None,
+                            *args: _PoolFactoryParams.args, **kwargs: _PoolFactoryParams.kwargs) -> IPool:
     global dictKnownPools
     global __pool_management_lock
 
     with __pool_management_lock:
-        if Poolname is None:
-            return GetGlobalLocalMachinePool()
-
         if Poolname in dictKnownPools:
             pool = dictKnownPools[Poolname]
-            assert (pool.__class__ == poolclass)
+            assert (pool.__class__ == pool_factory)
 
             return dictKnownPools[Poolname]
 
-        logging.info(f"Creating {Poolname} pool of type {poolclass}")
+        logging.info(f"Creating {Poolname} pool of type {pool_factory}")
 
-        pool = poolclass(num_threads, *args, **kwargs)
-        pool.name = Poolname
+        pool = pool_factory(Poolname, num_workers, *args, **kwargs)
 
         dictKnownPools[Poolname] = pool
 
@@ -261,31 +264,41 @@ def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -
     """
     Get or create a specific thread pool using vanilla python threads
     """
-    return __CreatePool(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
+    if Poolname is None:
+        return GetGlobalThreadPool()
+    return __CreatePoolFromFactory(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
 
 
 def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = None, is_global=False) -> IPool:
-    return __CreatePool(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads, is_global=is_global)
+    if Poolname is None:
+        return GetGlobalLocalMachinePool()
+    return __CreatePoolFromFactory(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads, is_global=is_global)
 
 
 def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     """Get or create a specific thread pool to execute threads in other processes on the same computer using the
     multiprocessing library """
     # warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
-    return __CreatePool(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
+    if Poolname is None:
+        return GetGlobalMultithreadingPool()
+    return __CreatePoolFromFactory(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
 
 
-def GetProcessPool(Poolname: str | None = None, num_threads: int | None = None) -> processpool.ProcessPool:
+def GetProcessPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     """Get or create a specific pool to invoke shell command processes on the same computer using the subprocess
     module """
     # warnings.warn(DeprecationWarning("GetProcessPool is deprecated.  Use GetLocalMachinePool instead"))
-    return __CreatePool(nornir_pools.processpool.ProcessPool, Poolname, num_threads)
+    if Poolname is None:
+        return GetGlobalProcessPool()
+    return __CreatePoolFromFactory(nornir_pools.processpool.ProcessPool, Poolname, num_threads)
 
 
 def GetParallelPythonPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
     """Get or create a specific pool to invoke functions or shell command processes on a cluster using parallel
     python """
-    return __CreatePool(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
+    if Poolname is None:
+        return GetGlobalClusterPool()
+    return __CreatePoolFromFactory(nornir_pools.parallelpythonpool.ParallelPythonProcess_Pool, Poolname, num_threads)
 
 
 def GetSerialPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
@@ -294,7 +307,7 @@ def GetSerialPool(Poolname: str | None = None, num_threads: int | None = None) -
     """
     if Poolname is None:
         raise ValueError("Must supply a pool name")
-    return __CreatePool(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
+    return __CreatePoolFromFactory(nornir_pools.serialpool.SerialPool, Poolname, num_threads)
 
 
 def GetGlobalSerialPool() -> IPool:
@@ -305,7 +318,7 @@ def GetGlobalSerialPool() -> IPool:
     # return GetProcessPool("Global local process pool")
 
 
-def GetGlobalProcessPool() -> processpool.ProcessPool:
+def GetGlobalProcessPool() -> IPool:
     """
     Common pool for processes on the local machine
     """

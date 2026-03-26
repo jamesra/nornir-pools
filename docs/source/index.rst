@@ -31,6 +31,15 @@ nornir_pools is pure python library available via Github::
 
   pip install git+https://github.com/nornir/nornir-pools.git --upgrade
 
+Profiling Output Path
+---------------------
+
+Set ``NORNIR_PROFILE`` to enable multiprocess profiling output and control where profile files are written.
+
+- If ``NORNIR_PROFILE`` resolves to a valid filesystem path (or can be created), that directory is used.
+- If ``NORNIR_PROFILE`` is set but invalid/uncreatable, nornir-pools falls back to a default temporary directory.
+- If ``NORNIR_PROFILE`` is not set, profiling output is not enabled for this path.
+
 Code sample : Calling a function on a thread vs a cluster
 ---------------------------------------------------------
    

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import traceback
+from typing import Any
 
 import nornir_pools
 from . import poolbase
@@ -66,10 +67,10 @@ class CTask(task.TaskWithEvent):
         assert (len(args) > 0)
         if not args[0] is None:
             assert (isinstance(args[0], dict))
-            self.__dict__.update(args[0])
+            self.__dict__.update(args[0])  # type: ignore[union-attr]
 
         if 'error_message' in self.__dict__:
-            sys.stderr.write(self.error_message)
+            sys.stderr.write(self.error_message)  # type: ignore[attr-defined]
 
         DecrementActiveJobCount()
 
@@ -102,7 +103,7 @@ class CTask(task.TaskWithEvent):
 
         # If we failed the call.  Check for an exception and raise if present
         if hasattr(self, 'exception'):
-            raise self.exception
+            raise self.exception  # type: ignore[attr-defined]
         elif not hasattr(self, 'returncode'):
             raise Exception("No return code from task, no exception detail provided, callback was reached")
         elif self.returncode < 0:
@@ -112,15 +113,15 @@ class CTask(task.TaskWithEvent):
         self.wait()
 
         if 'stdoutdata' in self.__dict__:
-            return self.stdoutdata
+            return self.stdoutdata  # type: ignore[attr-defined]
         elif 'returned_value' in self.__dict__:
-            return self.returned_value
+            return self.returned_value  # type: ignore[attr-defined]
         else:
             return None
 
 
 def RemoteWorkerProcess(cmd, fargs):
-    entry = {}
+    entry: dict[str, Any] = {}
 
     try:
         entry = {'type': 'RemoteWorkerProcess'}
@@ -136,10 +137,10 @@ def RemoteWorkerProcess(cmd, fargs):
         else:
             proc = subprocess.Popen(cmd)
 
-        returned_value = proc.communicate(input)
+        returned_value = proc.communicate()
         entry['returned_value'] = returned_value
-        entry['stdoutdata'] = returned_value[0].decode('utf-8')
-        entry['stderrdata'] = returned_value[1].decode('utf-8')
+        entry['stdoutdata'] = returned_value[0].decode('utf-8')  # type: ignore[union-attr]
+        entry['stderrdata'] = returned_value[1].decode('utf-8')  # type: ignore[union-attr]
         entry['returncode'] = proc.returncode
         proc = None
 
@@ -154,12 +155,12 @@ def RemoteWorkerProcess(cmd, fargs):
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
         # sys.stderr.write(error_message)
-    finally:
-        return entry
+
+    return entry
 
 
 def RemoteFunction(func, fargs):
-    entry = {}
+    entry: dict[str, Any] = {}
 
     try:
         entry = {'type': 'RemoteFunction'}
@@ -192,8 +193,8 @@ def RemoteFunction(func, fargs):
         server_message = "\n*** Cluster node %s raised exception: ***\n" % socket.gethostname()
         entry['error_message'] = server_message + error_message
         # sys.stderr.write(error_message)
-    finally:
-        return entry
+
+    return entry
 
 
 class ParallelPythonProcess_Pool(poolbase.PoolBase):
@@ -202,7 +203,7 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
     @property
     def server(self):
         if self._server is None:
-            self._server = pp.Server(ppservers=("*",))
+            self._server = pp.Server(ppservers=("*",))  # type: ignore[reportUndefinedVariable]
             nornir_pools._pprint("Creating server pool, wait three seconds for other servers to respond")
             time.sleep(3)
 
@@ -210,8 +211,8 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
 
         return self._server
 
-    def __init__(self, num_threads=None):
-        super(poolbase.PoolBase, self).__init__()
+    def __init__(self, name: str, num_workers: int | None = None, *args, **kwargs):
+        super(ParallelPythonProcess_Pool, self).__init__(name=name, *args, **kwargs)
         self._server = None
 
     #
@@ -260,7 +261,7 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback,
                                     globals=globals(), group=str(NextGroupName),
                                     modules=('socket', 'traceback', 'subprocess', 'sys'))
-        taskObj.ppTask = ppTask
+        taskObj.ppTask = ppTask  # type: ignore[attr-defined]
 
         NextGroupName += 1
 
@@ -287,7 +288,7 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback,
                                     globals=globals(), group=str(NextGroupName),
                                     modules=('socket', 'traceback', 'subprocess', 'sys'))
-        taskObj.ppTask = ppTask
+        taskObj.ppTask = ppTask  # type: ignore[attr-defined]
 
         NextGroupName += 1
 

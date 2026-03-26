@@ -48,20 +48,19 @@ class LocalMachinePool(poolbase.PoolBase):
     def get_active_nodes(self):
         return ["localhost"]
 
-    def __init__(self, num_threads, is_global=False, *args, **kwargs):
+    def __init__(self, name: str, num_workers: int | None = None, is_global=False, *args, **kwargs):
         '''
         Constructor
         '''
 
-        num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
+        num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
-        self._num_threads = num_threads
+        self._num_threads = num_workers
 
         self.is_global = is_global
         self._mtpool = None
         self._ppool = None
-
-        super(LocalMachinePool, self).__init__(*args, **kwargs)
+        super(LocalMachinePool, self).__init__(name=name, *args, **kwargs)
 
     def add_task(self, name, func, *args, **kwargs) -> nornir_pools.task.Task:
         return self._multithreading_pool.add_task(name, func, *args, **kwargs)

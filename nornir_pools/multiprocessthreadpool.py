@@ -11,7 +11,7 @@ import multiprocessing
 import multiprocessing.pool
 import os
 import tempfile
-from typing import *
+from typing import Callable, Dict
 
 import nornir_pools
 import nornir_pools.task
@@ -86,7 +86,7 @@ class NoDaemonProcess(multiprocessing.Process):
     def _set_daemon(self, value):
         pass
 
-    daemon = property(_get_daemon, _set_daemon)
+    daemon = property(_get_daemon, _set_daemon)  # type: ignore[assignment]
 
 
 #
@@ -119,18 +119,23 @@ class NonDaemonPool(multiprocessing.pool.Pool):
     _instance_id = 0
 
     @classmethod
-    def _get_root_profile_output_path(cls):
+    def _get_root_profile_output_path(cls) -> str:
         if cls._root_profile_output_dir is None:
-            if 'PROFILE_PATH' in os.environ:
+            default_dir = tempfile.mkdtemp(prefix="nornir-pools-profile-")
+            configured_path = os.environ.get("NORNIR_PROFILE")
+            if configured_path:
                 try:
-                    cls._root_profile_output_dir = os.environ['PROFILE_PATH']
-                    os.makedirs(cls._root_profile_output_dir, exist_ok=True)
+                    resolved_path = os.path.abspath(os.path.expanduser(configured_path))
+                    os.makedirs(resolved_path, exist_ok=True)
+                    cls._root_profile_output_dir = resolved_path
+                except (OSError, ValueError):
+                    cls._root_profile_output_dir = default_dir
+                    prettyoutput.Log(
+                        f"NORNIR_PROFILE '{configured_path}' is invalid; using default profile path: {default_dir}")
+            else:
+                cls._root_profile_output_dir = default_dir
 
-                except IOError:
-                    cls._root_profile_output_dir = tempfile.mkdtemp()
-                    prettyoutput.Log(f'Profiling data saved to: {cls._root_profile_output_dir}')
-                    pass
-
+        assert cls._root_profile_output_dir is not None
         return cls._root_profile_output_dir
 
     def __init__(self, *args, **kwargs):
@@ -141,7 +146,7 @@ class NonDaemonPool(multiprocessing.pool.Pool):
         NonDaemonPool._instance_id += 1
 
         # Create a directory to store profile data for each subprocess
-        if 'PROFILE' in os.environ:
+        if 'NORNIR_PROFILE' in os.environ:
             root_output_dir = NonDaemonPool._get_root_profile_output_path()
             self.profile_dir = os.path.join(root_output_dir, self.pool_name)
 
@@ -226,7 +231,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     """Pool of threads consuming tasks from a queue"""
 
     def add_process(self, name, func, *args, **kwargs):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @property
     def tasks(self):
@@ -245,15 +250,15 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     def num_active_tasks(self) -> int:
         return len(self._active_tasks)
 
-    def __init__(self, num_threads: int | None = None, maxtasksperchild: int | None = None,
+    def __init__(self, name: str, num_workers: int | None = None, maxtasksperchild: int | None = None,
                  authkey: bytes | None = None,
                  *args, **kwargs):
         self._tasks = None
         self._lock = multiprocessing.Lock()
 
-        num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
+        num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
-        self._num_processes = num_threads
+        self._num_processes = num_workers
         self._maxtasksperchild = maxtasksperchild
         # A list of incomplete AsyncResults
         self._active_tasks = {}  # type : Dict[int, MultiprocessThreadTask]
@@ -261,7 +266,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         # self.authkey = multiprocessing.current_process().authkey if authkey is None else authkey
         # self._shared_memory_manager = nornir_pools.get_or_create_shared_memory_manager(self.authkey)
 
-        super(MultiprocessThreadPool, self).__init__(*args, **kwargs)
+        super(MultiprocessThreadPool, self).__init__(name=name, *args, **kwargs)
 
     def shutdown(self):
         if hasattr(self, 'tasks'):
@@ -313,7 +318,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         # This hangs the caller if they wait on the task.
 
         retval_task = MultiprocessThreadTask(name, None, args, kwargs)
-        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,
+        retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,  # type: ignore[attr-defined]
                                                          callback=self.callback_wrapper(retval_task.task_id,
                                                                                         retval_task.callback),
                                                          error_callback=self.callback_wrapper(retval_task.task_id,
@@ -384,3 +389,5 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
             self._active_tasks[
                 task_id] = task  # Re-add the item to the _active_tasks so the callback can find it and remove it as expected
             task.wait()  # use wait to ensure any exceptions are thrown
+
+
