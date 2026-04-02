@@ -366,7 +366,7 @@ def GetGlobalMultithreadingPool() -> IPool:
 
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
-__LastConsoleWrite = datetime.datetime.utcnow()
+__LastConsoleWrite = datetime.datetime.now(datetime.UTC)
 
 
 def __CleanOutputForEclipse(s: str):
@@ -396,14 +396,14 @@ def __EclipseConsoleWriteError(s: str, newline: bool = False):
 def __PrintProgressUpdateEclipse(s: str):
     global __LastConsoleWrite
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
     delta = now - __LastConsoleWrite
 
     if delta.seconds < 10:
         return
 
     __EclipseConsoleWrite(s, newline=True)
-    __LastConsoleWrite = datetime.datetime.utcnow()
+    __LastConsoleWrite = datetime.datetime.now(datetime.UTC)
 
 
 def __ConsoleWrite(s: str, newline: bool = False):
