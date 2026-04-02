@@ -1,5 +1,6 @@
 # threadpool.py
 import math
+import logging
 import queue
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import traceback
 from typing import Any, Callable
 
 import nornir_pools
+import nornir_shared.misc
 from nornir_pools import poolbase
 from nornir_shared import prettyoutput
 from . import task
@@ -247,6 +249,9 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
                 kwargs['shell'] = True
         else:
             kwargs = {'shell': True}
+
+        # Ensure parent process has an established shared logging session before launching child processes.
+        nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
 
         if isinstance(func, str):
             entry = ImmediateProcessTask(name, func, *args, **kwargs)

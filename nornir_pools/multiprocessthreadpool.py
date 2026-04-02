@@ -16,6 +16,7 @@ from typing import Callable, Dict
 import nornir_pools
 import nornir_pools.task
 # import time
+import nornir_shared.misc
 from nornir_shared import prettyoutput
 
 # from threading import Lock
@@ -236,8 +237,10 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     @property
     def tasks(self):
         if self._tasks is None:
+            log_queue = nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
             self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes,
-                                        initializer=nornir_pools.init_pool_process, initargs=(self._lock,))
+                                        initializer=nornir_pools.init_pool_process,
+                                        initargs=(self._lock, log_queue, logging.getLogger().getEffectiveLevel()))
 
         return self._tasks
 

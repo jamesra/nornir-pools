@@ -5,6 +5,8 @@ Created on Apr 17, 2014
 '''
 
 import nornir_pools
+import nornir_shared.misc
+import logging
 from . import poolbase
 
 
@@ -27,6 +29,7 @@ class LocalMachinePool(poolbase.PoolBase):
     @property
     def _multithreading_pool(self):
         if self._mtpool is None:
+            nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
 
             if self.is_global:
                 self._mtpool = nornir_pools.GetGlobalMultithreadingPool()

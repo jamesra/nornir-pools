@@ -96,6 +96,7 @@ import nornir_pools.threadpool as threadpool
 from nornir_pools.ipool import IPool
 from nornir_pools.shared_memory import get_or_create_shared_memory_manager
 from nornir_pools.task import Task
+from nornir_shared import misc as nornir_logging_misc
 from nornir_shared import prettyoutput
 
 __ParallelPythonAvailable = False
@@ -117,12 +118,14 @@ __thread_limit_warning_shown = False
 
 # The lock can be accessed from multiprocessthreadpool from the parent process as well
 
-def init_pool_process(the_lock):
+def init_pool_process(the_lock, logging_queue=None, logging_level=None):
     global shared_lock
     shared_lock = the_lock
+    if logging_queue is not None:
+        nornir_logging_misc.ConfigureWorkerQueueLogging(log_queue=logging_queue, level=logging_level)
 
 
-def ApplyOSThreadLimit(num_threads: int):
+def ApplyOSThreadLimit(num_threads: int | None) -> int | None:
     """
     :return The minimum of the maximum number of threads on the OS, the 
     MAX_PYTHON_THREADS environment variable, or the requested num_threads
