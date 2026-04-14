@@ -1,14 +1,16 @@
 # threadpool.py
 import math
+import logging
 import queue
 import subprocess
 import sys
 import threading
 import time
 import traceback
-from typing import *
+from typing import Any, Callable
 
 import nornir_pools
+import nornir_shared.misc
 from nornir_pools import poolbase
 from nornir_shared import prettyoutput
 from . import task
@@ -77,15 +79,19 @@ class ImmediateProcessTask(task.TaskWithEvent):
 
 
 class ProcessTask(task.TaskWithEvent):
+    exception: Exception | None
+    stdoutdata: str
 
     def __init__(self, name: str, func: Callable, *args, **kwargs):
         super(ProcessTask, self).__init__(name, *args, **kwargs)
         self.cmd = func
+        self.exception = None
+        self.stdoutdata = ""
 
     def wait(self):
         super(ProcessTask, self).wait()
 
-        if hasattr(self, 'exception'):
+        if self.exception is not None:
             raise self.exception
         elif self.returncode < 0:
             raise Exception("Negative return code from task but no exception detail provided")
@@ -148,9 +154,10 @@ class Worker(threading.Thread):
             try:
                 proc = subprocess.Popen(entry.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *entry.args,
                                         **entry.kwargs)
-                entry.returned_value = proc.communicate(input)
-                entry.stdoutdata = entry.returned_value[0].decode('utf-8')
-                entry.stderrdata = entry.returned_value[1].decode('utf-8')
+                stdout_bytes, stderr_bytes = proc.communicate()
+                entry.returned_value = (stdout_bytes, stderr_bytes)
+                entry.stdoutdata = stdout_bytes.decode('utf-8') if isinstance(stdout_bytes, bytes) else stdout_bytes
+                entry.stderrdata = stderr_bytes.decode('utf-8') if isinstance(stderr_bytes, bytes) else stderr_bytes
                 proc = None
 
             except Exception as e:
@@ -208,19 +215,18 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
     def add_task(self, name: str, func: Callable, *args, **kwargs):
         self.add_process(name, func, *args, **kwargs)
 
-    def __init__(self, num_threads=None, WorkerCheckInterval=0.5):
+    def __init__(self, name: str, num_workers: int | None = None, WorkerCheckInterval=0.5):
         '''
-        :param int num_threads: Maximum number of threads in the pool
+        :param int num_workers: Maximum number of workers in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
-        super(ProcessPool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval)
+        super(ProcessPool, self).__init__(num_threads=num_workers, WorkerCheckInterval=WorkerCheckInterval, name=name)
 
         self._next_thread_id = 0
         # self.logger.warn("Creating Process Pool")
 
     def add_worker_thread(self) -> Worker:
-
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval)
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, float(self.WorkerCheckInterval or 0.0))
         w.name = "Process pool #%d" % self._next_thread_id
         self._next_thread_id += 1
         return w
@@ -243,6 +249,9 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
                 kwargs['shell'] = True
         else:
             kwargs = {'shell': True}
+
+        # Ensure parent process has an established shared logging session before launching child processes.
+        nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
 
         if isinstance(func, str):
             entry = ImmediateProcessTask(name, func, *args, **kwargs)

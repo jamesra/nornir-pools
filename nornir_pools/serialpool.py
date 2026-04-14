@@ -21,7 +21,7 @@ class SerialPool(poolbase.PoolBase):
     @property
     def _process_pool(self):
         if self._ppool is None:
-            self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)
+            self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)  # type: ignore[attr-defined]
 
         return self._ppool
 
@@ -32,28 +32,27 @@ class SerialPool(poolbase.PoolBase):
     def num_active_tasks(self) -> int:
         return 1
 
-    def __init__(self, num_threads, *args, **kwargs):
+    def __init__(self, name: str, num_workers: int | None = None, *args, **kwargs):
         '''
         Constructor
         '''
 
-        self._num_threads = num_threads
+        self._num_threads = num_workers
         self._ppool = None
-        # self._name = pool_name
-        super(SerialPool, self).__init__(*args, **kwargs)
+        super(SerialPool, self).__init__(name=name, *args, **kwargs)
 
     def add_task(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.Task:
         retval = func(*args, **kwargs)
         return nornir_pools.task.SerialTask(name, retval, *args, **kwargs)
 
     def add_process(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:
-        SingleParameterProc = subprocess.Popen(func + " && exit", shell=True, stdout=subprocess.PIPE,
+        SingleParameterProc = subprocess.Popen(str(func) + " && exit", shell=True, stdout=subprocess.PIPE,
                                                stderr=subprocess.PIPE)
 
         entry = nornir_pools.processpool.ProcessTask(name, func, *args, **kwargs)
-        entry.returned_value = SingleParameterProc.communicate(input)
-        entry.stdoutdata = entry.returned_value[0].decode('utf-8')
-        entry.stderrdata = entry.returned_value[1].decode('utf-8')
+        entry.returned_value = SingleParameterProc.communicate(None)  # type: ignore[attr-defined]
+        entry.stdoutdata = entry.returned_value[0].decode('utf-8')  # type: ignore[attr-defined]
+        entry.stderrdata = entry.returned_value[1].decode('utf-8')  # type: ignore[attr-defined]
         entry.returncode = SingleParameterProc.returncode
         entry.completed.set()
 

@@ -9,7 +9,7 @@ import math
 import queue
 import threading
 import time
-from typing import *
+from typing import Any, Callable
 
 import nornir_pools
 import nornir_pools.poolbase as poolbase
@@ -27,7 +27,7 @@ class ThreadTask(task.TaskWithEvent):
     func: Callable
 
     @property
-    def exception(self) -> Exception:
+    def exception(self) -> Exception | None:
         return self._exception
 
     @exception.setter
@@ -38,7 +38,7 @@ class ThreadTask(task.TaskWithEvent):
 
         self.func = func  # Function to be called when Task is removed from queue
         self.returned_value = None  # The value returned by the executing function
-        self._exception = None  # type: Exception | None
+        self._exception = None
 
         super(ThreadTask, self).__init__(name, *args, **kwargs)
 
@@ -189,23 +189,24 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
     """Pool of threads consuming tasks from a queue"""
 
     def add_process(self, name: str, func: Callable, *args, **kwargs):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     # How often workers check for new jobs in the queue
 
     def __init__(self,
-                 num_threads: int | None = None,
+                 name: str,
+                 num_workers: int | None = None,
                  WorkerCheckInterval: float | None = None,
                  *args, **kwargs):
         '''
-        :param int num_threads: Maximum number of threads in the pool
+        :param int num_workers: Maximum number of workers in the pool
         :param float WorkerCheckInterval: How long worker threads wait for tasks before shutting down
         '''
 
-        num_threads = nornir_pools.ApplyOSThreadLimit(num_threads)
+        num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
-        super(ThreadPool, self).__init__(num_threads=num_threads, WorkerCheckInterval=WorkerCheckInterval, *args,
-                                         **kwargs)
+        super(ThreadPool, self).__init__(num_threads=num_workers, WorkerCheckInterval=WorkerCheckInterval, name=name,
+                                         *args, **kwargs)
 
         self._next_thread_id = 0
 
@@ -216,7 +217,7 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         assert (self.shutdown_event.is_set() is False)
 
         worker_name = "Thread pool #%d" % self._next_thread_id
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, self.WorkerCheckInterval, name=worker_name)
+        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, float(self.WorkerCheckInterval or 0.0), name=worker_name)
         self._next_thread_id += 1
         return w
 
@@ -241,3 +242,5 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         self.tasks.put(entry)
         self.add_threads_if_needed()
         return entry
+
+

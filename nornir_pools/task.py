@@ -2,7 +2,7 @@ import datetime
 import math
 import threading
 import time
-from abc import *
+from abc import ABC, abstractmethod
 from typing import Any
 
 

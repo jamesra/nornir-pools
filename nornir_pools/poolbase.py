@@ -4,7 +4,7 @@ import multiprocessing
 import queue
 import threading
 import time
-from abc import *
+from abc import ABC, abstractmethod
 
 import nornir_pools
 from nornir_pools.ipool import IPool
@@ -17,11 +17,7 @@ class PoolBase(IPool):
 
     @property
     def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, val: str):
-        self._name = val
+        return self._name or ""
 
     @property
     def logger(self):
@@ -105,16 +101,16 @@ class LocalThreadPoolBase(PoolBase, ABC):
         if self.WorkerCheckInterval is None:
             self.WorkerCheckInterval = LocalThreadPoolBase.WorkerCheckInterval
 
-        LocalThreadPoolBase.TryRegisterAtExit(self.WorkerCheckInterval * 1.25)
+        LocalThreadPoolBase.TryRegisterAtExit((self.WorkerCheckInterval or 1) * 1.25)
 
         self._max_threads = kwargs.get('num_threads', multiprocessing.cpu_count())
 
         if self._max_threads is None:
-            self._max_threads = multiprocessing.cpu_count()
+            self._max_threads = multiprocessing.cpu_count() or 1
 
         self._max_threads = nornir_pools.ApplyOSThreadLimit(self._max_threads)
 
-        self.tasks = queue.Queue(maxsize=self._max_threads * 32)  # Queue for tasks yet to be completed by a thread
+        self.tasks = queue.Queue(maxsize=(self._max_threads or 1) * 32)  # Queue for tasks yet to be completed by a thread
         # self.task_exceptions = queue.Queue() #Tasks that raise an unhandled exception are added to this queue
 
     def shutdown(self):
@@ -140,10 +136,11 @@ class LocalThreadPoolBase(PoolBase, ABC):
         self.remove_finished_threads()
         num_active_threads = len(self._threads)
 
-        if num_active_threads == self._max_threads:
+        max_t = self._max_threads or 1
+        if num_active_threads == max_t:
             return
 
-        num_threads_needed = min(self._max_threads, self.tasks.qsize() + 1) - num_active_threads
+        num_threads_needed = min(max_t, self.tasks.qsize() + 1) - num_active_threads
 
         num_threads_created = 0
         # while num_active_threads < min((self._max_threads, self.tasks.qsize()+1)):
@@ -183,3 +180,5 @@ class LocalThreadPoolBase(PoolBase, ABC):
 
         self.tasks.join()
         self.remove_finished_threads()
+
+

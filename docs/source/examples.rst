@@ -29,3 +29,9 @@ Calling a function on a cluster
    task = thread_pool.add_task("Add 3 + 5", Add, 3,y=5)
    sum = task.wait_return()
    print str(sum)
+
+Profiling note
+==============
+
+To enable multiprocess profile output, set ``NORNIR_PROFILE`` to a target directory path.
+If the path is invalid or cannot be created, nornir-pools will automatically use a temporary fallback directory.
