@@ -118,6 +118,9 @@ __thread_limit_warning_shown = False
 
 # The lock can be accessed from multiprocessthreadpool from the parent process as well
 
+def IsParallelPythonAvailable():
+    return __ParallelPythonAvailable
+
 def init_pool_process(the_lock, logging_queue=None, logging_level=None):
     global shared_lock
     shared_lock = the_lock

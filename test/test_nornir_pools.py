@@ -356,6 +356,9 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
 
     def runTest(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
+        if not pools.IsParallelPythonAvailable():
+            self.skipTest("TestClusterPoolFunctions, Parallel Python is not available")
+            return
 
         PPool = pools.GetGlobalClusterPool()
         self.assertIsNotNone(PPool)
@@ -379,11 +382,15 @@ class TestClusterPool(unittest.TestCase):
     def runTest(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 
+        if not pools.IsParallelPythonAvailable():
+            self.skipTest("TestClusterPool, Parallel Python is not available")
+            return
+
         PPool = pools.GetGlobalClusterPool()
         self.assertIsNotNone(PPool)
 
         numTasksInTest = 100
-
+ 
         nodes = PPool.get_active_nodes()
         print("Active Nodes")
         print(str(nodes))
