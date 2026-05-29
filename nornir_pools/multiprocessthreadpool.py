@@ -10,7 +10,10 @@ import logging
 import multiprocessing
 import multiprocessing.pool
 import os
+import sys
 import tempfile
+import threading
+from pathlib import Path
 from typing import Callable, Dict
 
 import nornir_pools
@@ -22,6 +25,40 @@ from nornir_shared import prettyoutput
 # from threading import Lock
 
 _profiler = None  # type: None | cProfile.Profile
+_worker_profiler_atexit_registered = False
+
+
+def _ensure_repo_root_on_worker_pythonpath() -> None:
+    """ForkServer/spawn pool workers unpickle callables from ``tests.*``; they exec Python with ``PYTHONPATH``.
+
+    ``pytest_configure`` / IDE may not set this before the forkserver starts, and ``sys.path`` from the parent
+    is not always visible in workers. Prefer the checkout root that contains both ``nornir_pools/`` and
+    ``tests/``. If ``nornir_pools`` is loaded from ``site-packages`` only, fall back to scanning ``sys.path``
+    (typical monorepo ``pythonpath``).
+    """
+    primary = Path(__file__).resolve().parents[1]
+    repo_root: Path | None = None
+    if (primary / "tests").is_dir() and (primary / "nornir_pools").is_dir():
+        repo_root = primary
+    else:
+        for entry in sys.path:
+            if not entry or entry == ".":
+                continue
+            try:
+                pe = Path(entry).resolve()
+            except OSError:
+                continue
+            if (pe / "tests").is_dir() and (pe / "nornir_pools").is_dir():
+                repo_root = pe
+                break
+    if repo_root is None:
+        repo_root = primary
+    rs = str(repo_root)
+    sep = os.pathsep
+    cur = os.environ.get("PYTHONPATH", "")
+    parts = [p for p in cur.split(sep) if p]
+    if rs not in parts:
+        os.environ["PYTHONPATH"] = rs + (sep + cur if cur else "")
 
 
 def _poolinit(profile_dir: str | None = None,
@@ -29,6 +66,7 @@ def _poolinit(profile_dir: str | None = None,
               intitializer_args: list | None = None,
               initializer_kwargs: dict | None = None):
     global _profiler
+    global _worker_profiler_atexit_registered
     _profiler = None
 
     if profile_dir is not None:
@@ -36,7 +74,10 @@ def _poolinit(profile_dir: str | None = None,
         _profiler = cProfile.Profile()
         _profiler.enable()
 
-        atexit.register(_processfinalizer, profile_dir)
+        # One atexit per worker process; avoids stacking duplicate finalizers when workers are recycled.
+        if not _worker_profiler_atexit_registered:
+            atexit.register(_processfinalizer, profile_dir)
+            _worker_profiler_atexit_registered = True
 
     if initializer is not None:
         if intitializer_args is None:
@@ -118,6 +159,8 @@ class NoDaemonProcess(multiprocessing.Process):
 class NonDaemonPool(multiprocessing.pool.Pool):
     _root_profile_output_dir = None
     _instance_id = 0
+    _merge_atexit_registered: set[tuple[str, str]] = set()
+    _merge_atexit_lock = threading.Lock()
 
     @classmethod
     def _get_root_profile_output_path(cls) -> str:
@@ -146,12 +189,17 @@ class NonDaemonPool(multiprocessing.pool.Pool):
 
         NonDaemonPool._instance_id += 1
 
-        # Create a directory to store profile data for each subprocess
+        # Create a directory to store profile data for each subprocess.
+        # Tests may unset NORNIR_PROFILE to skip profiling I/O and atexit hooks.
         if 'NORNIR_PROFILE' in os.environ:
             root_output_dir = NonDaemonPool._get_root_profile_output_path()
             self.profile_dir = os.path.join(root_output_dir, self.pool_name)
 
-            atexit.register(nornir_pools.MergeProfilerStats, root_output_dir, self.profile_dir, self.pool_name)
+            merge_key = (root_output_dir, self.pool_name)
+            with NonDaemonPool._merge_atexit_lock:
+                if merge_key not in NonDaemonPool._merge_atexit_registered:
+                    NonDaemonPool._merge_atexit_registered.add(merge_key)
+                    atexit.register(nornir_pools.MergeProfilerStats, root_output_dir, self.profile_dir, self.pool_name)
 
             if 'initializer' in kwargs:
                 # assert ('initializer' not in kwargs)
@@ -237,16 +285,17 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     @property
     def tasks(self):
         if self._tasks is None:
+            _ensure_repo_root_on_worker_pythonpath()
             log_queue = nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
             self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes,
                                         initializer=nornir_pools.init_pool_process,
-                                        initargs=(self._lock, log_queue, logging.getLogger().getEffectiveLevel()))
+                                        initargs=(log_queue, logging.getLogger().getEffectiveLevel()))
 
         return self._tasks
 
     @property
     def lock(self):
-        '''A lock that is shared among all child processes'''
+        """Parent-process ``multiprocessing.Lock`` only; not passed to workers (see init_pool_process)."""
         return self._lock
 
     @property
@@ -257,8 +306,11 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
                  authkey: bytes | None = None,
                  *args, **kwargs):
         self._tasks = None
+        # Parent-only lock (not sent through Pool initializer; avoids fork/pickle surface for unused shared_lock).
         self._lock = multiprocessing.Lock()
 
+        if num_workers is None:
+            num_workers = multiprocessing.cpu_count() or 4
         num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
         self._num_processes = num_workers
@@ -387,10 +439,13 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     def wait_completion(self):
 
         """Wait for completion of all the tasks in the queue"""
+        # Never pop a task out of _active_tasks before waiting: the pool's result
+        # thread can deliver the outcome in that window, callback_wrapper would not
+        # find task_id, raise ValueError before AsyncResult._event.set(), and wait()
+        # would hang forever under multiprocess pool stress.
         while len(self._active_tasks) > 0:
-            (task_id, task) = self._active_tasks.popitem()
-            self._active_tasks[
-                task_id] = task  # Re-add the item to the _active_tasks so the callback can find it and remove it as expected
-            task.wait()  # use wait to ensure any exceptions are thrown
+            pending = list(self._active_tasks.values())
+            for task in pending:
+                task.wait()
 
 

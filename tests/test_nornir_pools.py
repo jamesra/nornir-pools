@@ -6,67 +6,31 @@ Created on Feb 14, 2013
 import collections
 import multiprocessing
 import os
-import random
 import shutil
 import time
 import unittest
 
 import nornir_pools as pools
+import nornir_pools._test_pool_tasks as pool_tasks  # pyright: ignore[reportMissingImports]
+import pytest
+
+@pytest.fixture
+def limited_threads(monkeypatch):
+    monkeypatch.setenv("MAX_PYTHON_THREADS", "4")
+    yield
+
+@pytest.fixture(autouse=True)
+def no_nornir_log_root(monkeypatch):
+    monkeypatch.delenv("NORNIR_LOG_ROOT", raising=False)
 
 
-def CreateFile(path, number):
-    '''Create a file in the path whose name is [number].txt
-       store the number in the file.'''
-
-    filename = TestThreadPool.FilenameTemplate % number
-    filenamefullpath = os.path.join(path, filename)
-
-    with open(filenamefullpath, 'w+') as hFile:
-        hFile.write(str(number))
-
-
-def ReadFile(path, number):
-    filename = TestThreadPool.FilenameTemplate % number
-    filenamefullpath = os.path.join(path, filename)
-
-    # test.assertTrue(os.path.exists(filenamefullpath))
-
-    numStr = "-1"
-    with open(filenamefullpath, 'r') as hFile:
-        numStr = hFile.read()
-
-    return int(numStr)
-
-
-def SleepForRandomTime(MaxTime=0.25):
-    '''Sleep for a random amount of time and return the pid we slept on'''
-    sleepTime = random.random() * MaxTime
-    time.sleep(sleepTime)
-    return os.getpid()
-
-
-def CreateFileWithDelay(path, number):
-    '''Create a file in the path whose name is [number].txt
-       store the number in the file.'''
-
-    SleepForRandomTime()
-    return CreateFile(path, number)
-
-
-def ReadFileWithDelay(path, number):
-    SleepForRandomTime()
-    return ReadFile(path, number)
-
-
-def RaiseException(msg=None):
-    if msg is None:
-        msg = ""
-
-    raise IntentionalPoolException(msg)
-
-
-class IntentionalPoolException(Exception):
-    pass
+CreateFile = pool_tasks.CreateFile
+ReadFile = pool_tasks.ReadFile
+SleepForRandomTime = pool_tasks.SleepForRandomTime
+CreateFileWithDelay = pool_tasks.CreateFileWithDelay
+ReadFileWithDelay = pool_tasks.ReadFileWithDelay
+RaiseException = pool_tasks.RaiseException
+IntentionalPoolException = pool_tasks.IntentionalPoolException
 
 
 def VerifyExceptionBehaviour(test, pool):
@@ -109,15 +73,8 @@ def VerifyExceptionBehaviour(test, pool):
                     "wait_completion: No exception reported when raised in thread and pool.wait_completion called")
 
 
-def SquareTheNumberWithDelay(num):
-    '''Squares the number on a thread'''
-    SleepForRandomTime()
-    return SquareTheNumber(num)
-
-
-def SquareTheNumber(num):
-    '''Squares the number on a thread'''
-    return num * num
+SquareTheNumberWithDelay = pool_tasks.SquareTheNumberWithDelay
+SquareTheNumber = pool_tasks.SquareTheNumber
 
 
 def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsInTest=100):
@@ -144,8 +101,15 @@ def runFunctionOnPool(self, TPool, Func=None, ExpectedResults=None, numThreadsIn
 
 
 def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
+    cpu_n = multiprocessing.cpu_count() or 4
+    expected_processes = pools.ApplyOSThreadLimit(cpu_n)
+    self.assertIsNotNone(expected_processes)
+
+    if expected_processes is None:
+        expected_processes = cpu_n
+
     if not numTasksInTest:
-        numTasksInTest = multiprocessing.cpu_count() * 4
+        numTasksInTest = expected_processes * 4
 
     tasks = []
     for i in range(1, numTasksInTest):
@@ -155,7 +119,12 @@ def runEvenDistributionOfWorkTestOnThePool(self, TPool, numTasksInTest=None):
     TPool.wait_completion()
 
     pid_collection = collections.Counter([p.wait_return() for p in tasks])
-    self.assertTrue(len(pid_collection) == multiprocessing.cpu_count(), "All processes should have done work")
+    self.assertEqual(
+        len(pid_collection),
+        expected_processes,
+        "All pool worker processes should have done work (expected %s, got PIDs %s)"
+        % (expected_processes, dict(pid_collection)),
+    )
 
 
 def runFileIOOnPool(self, TPool, CreateFunc=None, ReadFunc=None, numThreadsInTest=100):
@@ -230,7 +199,7 @@ class PoolTestBase(unittest.TestCase):
         os.makedirs(self.TestOutputPath)
         self.assertTrue(os.path.exists(self.TestOutputPath), "Test output directory does not exist after creation")
 
-    def runTest(self):
+    def test_pool_test_base(self):
         self.skipTest("PoolTestBase, no test implemented")
 
     def tearDown(self):
@@ -249,7 +218,7 @@ class TestThreadPoolBase(PoolTestBase):
 
 class TestThreadPool(TestThreadPoolBase):
 
-    def runTest(self):
+    def test_test_thread_pool(self):
         numThreadsInTest = 100
 
         CreateFile(self.TestOutputPath, 0)
@@ -274,9 +243,10 @@ class TestThreadPool(TestThreadPoolBase):
         runFileIOOnPool(self, TPool)
 
 
+@pytest.mark.usefixtures("limited_threads", "no_nornir_log_root")
 class TestMultiprocessThreadPool(TestThreadPoolBase):
 
-    def runTest(self):
+    def test_test_multiprocess_thread_pool(self):
         numThreadsInTest = 100
 
         CreateFile(self.TestOutputPath, 0)
@@ -284,7 +254,6 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
         self.assertTrue(os.path.exists(ExpectedPath), "Function we are testing threads with does not seem to work")
         os.remove(ExpectedPath)
 
-        # Create a 100 threads and have them create files
         TPool = pools.GetGlobalMultithreadingPool()
         self.assertIsNotNone(TPool)
 
@@ -299,11 +268,12 @@ class TestMultiprocessThreadPool(TestThreadPoolBase):
         runFileIOOnPool(self, TPool)
 
 
+@pytest.mark.usefixtures("limited_threads")
 class TestMultiprocessThreadPoolWithRandomDelay(TestMultiprocessThreadPool):
     ''' Same as TestThreadPool, but the functions call sleep for random amounts of time'''
     FilenameTemplate = "%04d.txt"
 
-    def runTest(self):
+    def test_test_multiprocess_thread_pool_with_random_delay(self):
         TPool = pools.GetGlobalMultithreadingPool()
         self.assertIsNotNone(TPool)
 
@@ -316,7 +286,7 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
     ''' Same as TestThreadPool, but the functions call sleep for random amounts of time'''
     FilenameTemplate = "%04d.txt"
 
-    def runTest(self):
+    def test_test_thread_pool_with_random_delay(self):
         TPool = pools.GetGlobalThreadPool()
         self.assertIsNotNone(TPool)
 
@@ -328,7 +298,7 @@ class TestThreadPoolWithRandomDelay(TestThreadPool):
 
 class TestProcessPool(unittest.TestCase):
 
-    def runTest(self):
+    def test_test_process_pool(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 
         PPool = pools.GetGlobalProcessPool()
@@ -354,7 +324,7 @@ class TestProcessPool(unittest.TestCase):
 
 class TestClusterPoolFunctions(TestThreadPoolBase):
 
-    def runTest(self):
+    def test_test_cluster_pool_functions(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
         if not pools.IsParallelPythonAvailable():
             self.skipTest("TestClusterPoolFunctions, Parallel Python is not available")
@@ -379,7 +349,7 @@ class TestClusterPoolFunctions(TestThreadPoolBase):
 
 class TestClusterPool(unittest.TestCase):
 
-    def runTest(self):
+    def test_test_cluster_pool(self):
         # command line parameters are different on different platforms, so  I'm keeping this simpler than the threading test for now
 
         if not pools.IsParallelPythonAvailable():

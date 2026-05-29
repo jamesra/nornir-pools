@@ -111,7 +111,7 @@ dictKnownPools = {}
 
 max_windows_threads = 1024
 
-shared_lock = None  # A multiprocessing.Lock that all child processes shared.
+shared_lock = None  # Set only when a caller passes the_lock into init_pool_process (optional; unused in-tree).
 
 __thread_limit_warning_shown = False
 
@@ -121,7 +121,8 @@ __thread_limit_warning_shown = False
 def IsParallelPythonAvailable():
     return __ParallelPythonAvailable
 
-def init_pool_process(the_lock, logging_queue=None, logging_level=None):
+def init_pool_process(logging_queue=None, logging_level=None, the_lock=None):
+    """Worker initializer: configure queue logging. Optional ``the_lock`` sets ``shared_lock`` (legacy API)."""
     global shared_lock
     shared_lock = the_lock
     if logging_queue is not None:
@@ -369,7 +370,7 @@ def GetGlobalMultithreadingPool() -> IPool:
 
 
 # ToPreventFlooding the output I only write pool size every five seconds when running under ECLIPSE
-__LastConsoleWrite = datetime.datetime.utcnow()
+__LastConsoleWrite = datetime.datetime.now(datetime.UTC)
 
 
 def __CleanOutputForEclipse(s: str):
