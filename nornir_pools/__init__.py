@@ -82,6 +82,7 @@ import sys
 import threading
 import warnings
 import platform
+from enum import Enum
 from typing import ParamSpec, Protocol
 
 import nornir_pools.ipool as ipool
@@ -171,6 +172,106 @@ __pool_management_lock = threading.RLock()
 _PoolFactoryParams = ParamSpec("_PoolFactoryParams")
 
 
+class PoolKind(Enum):
+    """Whether a pool primarily uses in-process threads (GIL) or worker processes."""
+
+    THREAD = "thread"
+    PROCESS = "process"
+
+
+_THREAD_POOL_FACTORIES: tuple[type, ...] = (
+    threadpool.ThreadPool,
+    processpool.ProcessPool,
+    serialpool.SerialPool,
+)
+
+
+def _factory_pool_kind(pool_factory: type) -> PoolKind:
+    """Classify a pool factory for selective wait/shutdown helpers."""
+    if pool_factory in _THREAD_POOL_FACTORIES:
+        return PoolKind.THREAD
+    return PoolKind.PROCESS
+
+
+def _pool_kind(pool: IPool) -> PoolKind:
+    """Return the pool kind recorded at creation time."""
+    kind = getattr(pool, "_nornir_pool_kind", None)
+    if kind is None:
+        return PoolKind.THREAD
+    return kind
+
+
+def _pool_diag_enabled() -> bool:
+    """Return True when NORNIR_POOL_DIAG requests pool lifecycle logging."""
+    return os.environ.get("NORNIR_POOL_DIAG", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _keep_process_pools() -> bool:
+    """Return True when process pools should stay open across pipeline stage boundaries."""
+    return os.environ.get("NORNIR_KEEP_PROCESS_POOLS", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _log_pool_diag(event: str) -> None:
+    """Log pool names, kinds, and active task counts when diagnostics are enabled."""
+    if not _pool_diag_enabled():
+        return
+    gil_enabled = getattr(sys, "_is_gil_enabled", lambda: "unknown")()
+    with __pool_management_lock:
+        pool_summary = [
+            (name, _pool_kind(pool).name, pool.num_active_tasks)
+            for name, pool in dictKnownPools.items()
+        ]
+    logging.getLogger(__name__).info(
+        "NORNIR_POOL_DIAG %s gil=%s active_threads=%s pools=%s",
+        event,
+        gil_enabled,
+        threading.active_count(),
+        pool_summary,
+    )
+
+
+def _snapshot_pools() -> list[tuple[str, IPool]]:
+    """Return a consistent copy of the known pool map."""
+    with __pool_management_lock:
+        return list(dictKnownPools.items())
+
+
+def _wait_pools(kind: PoolKind | None = None) -> None:
+    """Block until active tasks complete on pools of the given kind (or all pools)."""
+    for key, pool in _snapshot_pools():
+        if kind is not None and _pool_kind(pool) != kind:
+            continue
+        if pool.num_active_tasks > 0:
+            _sprint("Waiting on pool: {0}".format(str(pool)))
+        pool.wait_completion()
+
+
+def _shutdown_pools(kind: PoolKind | None = None) -> None:
+    """Shut down pools of the given kind (or all pools) after waiting for tasks."""
+    while True:
+        pool_items = _snapshot_pools()
+        targets = [
+            (key, pool)
+            for key, pool in pool_items
+            if kind is None or _pool_kind(pool) == kind
+        ]
+        if not targets:
+            break
+        for key, pool in targets:
+            live_pool: IPool | None = None
+            with __pool_management_lock:
+                if key in dictKnownPools:
+                    live_pool = dictKnownPools[key]
+            if live_pool is None:
+                continue
+            if live_pool.num_active_tasks > 0:
+                _sprint("Waiting on pool: {0}".format(str(live_pool)))
+            live_pool.shutdown()
+            with __pool_management_lock:
+                if key in dictKnownPools:
+                    del dictKnownPools[key]
+
+
 class PoolFactory(Protocol[_PoolFactoryParams]):
     def __call__(self, name: str, num_workers: int | None = None, /, *args: _PoolFactoryParams.args,
                  **kwargs: _PoolFactoryParams.kwargs) -> IPool:
@@ -194,25 +295,53 @@ def __CreatePoolFromFactory(pool_factory: PoolFactory[_PoolFactoryParams],
         logging.info(f"Creating {Poolname} pool of type {pool_factory}")
 
         pool = pool_factory(Poolname, num_workers, *args, **kwargs)
+        pool._nornir_pool_kind = _factory_pool_kind(pool_factory)
 
         dictKnownPools[Poolname] = pool
 
         return pool
 
 
-def WaitOnAllPools():
-    global dictKnownPools
-    global __pool_management_lock
+def WaitOnAllPools() -> None:
+    """Wait for all known pools to finish queued work without shutting them down."""
+    _log_pool_diag("WaitOnAllPools")
+    _wait_pools(None)
 
-    pool_items = None
-    with __pool_management_lock:
-        pool_items = list(dictKnownPools.items())
 
-    for (key, pool) in pool_items:
-        if pool.num_active_tasks > 0:
-            _sprint("Waiting on pool: " + str(pool))
+def WaitOnThreadPools() -> None:
+    """Wait for in-process thread pools to finish without shutting them down."""
+    _log_pool_diag("WaitOnThreadPools")
+    _wait_pools(PoolKind.THREAD)
 
-        pool.wait_completion()
+
+def WaitOnProcessPools() -> None:
+    """Wait for process-backed pools to finish without shutting them down."""
+    _log_pool_diag("WaitOnProcessPools")
+    _wait_pools(PoolKind.PROCESS)
+
+
+def CloseThreadPools(*, skip_wait: bool = False) -> None:
+    """Shut down thread pools after optionally waiting for their tasks to complete."""
+    _log_pool_diag("CloseThreadPools")
+    if not skip_wait:
+        _wait_pools(PoolKind.THREAD)
+    _shutdown_pools(PoolKind.THREAD)
+
+
+def CloseProcessPools() -> None:
+    """Shut down process pools after waiting; skipped when NORNIR_KEEP_PROCESS_POOLS is set."""
+    _log_pool_diag("CloseProcessPools")
+    _wait_pools(PoolKind.PROCESS)
+    if _keep_process_pools():
+        return
+    _shutdown_pools(PoolKind.PROCESS)
+
+
+def ReleaseStagePools() -> None:
+    """Wait for all pool work, then shut down thread pools only (reuse process pools)."""
+    _log_pool_diag("ReleaseStagePools")
+    WaitOnAllPools()
+    CloseThreadPools(skip_wait=True)
 
 
 def _remove_pool(p: str | IPool):
@@ -230,41 +359,13 @@ def _remove_pool(p: str | IPool):
 
 
 @atexit.register
-def ClosePools():
-    """
-    Shutdown all pools.
-
-    """
-    global dictKnownPools
+def ClosePools() -> None:
+    """Shut down all known pools (wait for tasks, then destroy workers)."""
     global profiler
-    global __pool_management_lock
 
-    with __pool_management_lock:
-        pool_items = list(dictKnownPools.items())
-
-    while len(pool_items) > 0:
-        for (key, pool) in pool_items:
-            if pool.num_active_tasks > 0:
-                _sprint("Waiting on pool: {0}".format(str(pool)))
-
-            pool = None
-            with __pool_management_lock:
-                if key in dictKnownPools:
-                    pool = dictKnownPools[key]
-                else:
-                    _sprint("pool {0} no longer in known pool list.  Moving on.".format(str(pool)))
-
-            if pool is None:
-                continue
-
-            pool.shutdown()
-
-            with __pool_management_lock:
-                if key in dictKnownPools:
-                    del dictKnownPools[key]
-
-        with __pool_management_lock:
-            pool_items = list(dictKnownPools.items())
+    _log_pool_diag("ClosePools")
+    _wait_pools(None)
+    _shutdown_pools(None)
 
 
 def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:

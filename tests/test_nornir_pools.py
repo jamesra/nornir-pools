@@ -410,6 +410,39 @@ class TestClusterPool(unittest.TestCase):
 #        self.assertEqual(Sum, sum(range(1,numTasksInTest)), "Testing to ensure each number in test range was created")
 #
 
+
+class TestSelectivePoolShutdown(unittest.TestCase):
+    """Tests for selective pool wait/shutdown helpers."""
+
+    def tearDown(self) -> None:
+        pools.ClosePools()
+
+    def test_pool_kind_classification(self) -> None:
+        """Thread and process pool factories receive distinct PoolKind tags."""
+        thread_pool = pools.GetThreadPool("KindTestThread", num_threads=2)
+        process_pool = pools.GetMultithreadingPool("KindTestProcess", num_threads=2)
+        self.assertEqual(pools._pool_kind(thread_pool), pools.PoolKind.THREAD)
+        self.assertEqual(pools._pool_kind(process_pool), pools.PoolKind.PROCESS)
+
+    def test_close_thread_pools_preserves_process_pool(self) -> None:
+        """CloseThreadPools removes thread pools but leaves process pools registered."""
+        pools.GetThreadPool("SelectiveThreadPool", num_threads=2)
+        pools.GetMultithreadingPool("SelectiveProcessPool", num_threads=2)
+        pools.CloseThreadPools()
+        remaining = set(pools.dictKnownPools.keys())
+        self.assertNotIn("SelectiveThreadPool", remaining)
+        self.assertIn("SelectiveProcessPool", remaining)
+
+    def test_release_stage_pools_preserves_process_pool(self) -> None:
+        """ReleaseStagePools waits and closes thread pools only."""
+        pools.GetThreadPool("ReleaseThreadPool", num_threads=2)
+        pools.GetMultithreadingPool("ReleaseProcessPool", num_threads=2)
+        pools.ReleaseStagePools()
+        remaining = set(pools.dictKnownPools.keys())
+        self.assertNotIn("ReleaseThreadPool", remaining)
+        self.assertIn("ReleaseProcessPool", remaining)
+
+
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
     # multiprocessing.freeze_support()
