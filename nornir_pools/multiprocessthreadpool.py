@@ -194,6 +194,7 @@ class NonDaemonPool(multiprocessing.pool.Pool):
         if 'NORNIR_PROFILE' in os.environ:
             root_output_dir = NonDaemonPool._get_root_profile_output_path()
             self.profile_dir = os.path.join(root_output_dir, self.pool_name)
+            os.makedirs(self.profile_dir, exist_ok=True)
 
             merge_key = (root_output_dir, self.pool_name)
             with NonDaemonPool._merge_atexit_lock:
@@ -333,6 +334,17 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
             self._tasks = None
 
         nornir_pools._remove_pool(self)
+
+    def terminate_workers(self) -> None:
+        """Terminate worker processes without waiting for graceful pool close (test teardown)."""
+        if self._tasks is not None:
+            try:
+                self._tasks.terminate()
+                self._tasks.join()
+            except Exception:
+                pass
+            self._active_tasks.clear()
+            self._tasks = None
 
     def callback_wrapper(self, task_id: int, callback_func: Callable):
         def wrapper_function(result):

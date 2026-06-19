@@ -54,13 +54,64 @@ Task Objects
 .. autoclass:: nornir_pools.task.Task
    :members:
 
-Pool Destruction
-----------------
+Pool lifecycle
+--------------
 
-It is not necessary to perform any cleanup.  Functions to delete pools would not be hard to add.  ClosePools is
-called automatically at script termination by atexit
+It is not necessary to perform cleanup during normal scripting; :func:`ClosePools` runs
+automatically at process exit via ``atexit``.  Long-running pipelines (for example
+``nornir_buildmanager``) enqueue work on global pools across many stages.  **Waiting**
+for tasks and **shutting down** pools are separate operations:
 
-.. autofunction:: nornir_pools.ClosePools
+* **Wait** — block until queued tasks finish.  Pools stay registered and accept new work.
+* **Close** — shut down workers and remove the pool from the registry (after waiting,
+  unless ``skip_wait`` is used).
+
+Thread-kind pools (``ThreadPool``, subprocess ``ProcessPool``, ``SerialPool``) run inside
+the parent process.  Process-kind pools (``MultiprocessThreadPool``, ``LocalMachinePool``,
+``ParallelPythonProcess_Pool``, cluster pools) keep OS worker processes alive.  Spawning
+those workers is expensive, so production code keeps process pools warm across pipeline
+stages and recreates thread pools at stage boundaries instead.
+
+.. py:class:: PoolKind
+
+   Classifies a pool for selective wait/shutdown helpers.  ``THREAD`` pools are
+   in-process; ``PROCESS`` pools use separate worker processes.
+
+.. autofunction:: WaitOnAllPools
+.. autofunction:: WaitOnThreadPools
+.. autofunction:: WaitOnProcessPools
+.. autofunction:: CloseThreadPools
+.. autofunction:: CloseProcessPools
+.. autofunction:: ReleaseStagePools
+.. autofunction:: ClosePools
+
+Stage boundaries (recommended)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+At the end of a pipeline stage that used pools (import finished, transform saved, overlay
+assembly complete, ``PipelineManager.Execute`` returned, etc.), call
+:func:`ReleaseStagePools`:
+
+1. Wait for **all** thread- and process-pool tasks to finish so stage outputs are safe
+   to read.
+2. Shut down **thread-kind** pools so idle in-process workers do not linger.
+3. Leave **process-kind** pools registered so the next stage reuses warm workers.
+
+Use :func:`WaitOnAllPools` when you only need synchronization and will enqueue more work
+immediately without releasing thread workers.  Use :func:`ClosePools` once at process
+exit or test teardown when every pool must be destroyed.
+
+Environment variables
+^^^^^^^^^^^^^^^^^^^^^
+
+``NORNIR_POOL_DIAG``
+    When set to ``1``, ``true``, or ``yes``, log pool names, kinds, and active task
+    counts on each lifecycle call.
+
+``NORNIR_KEEP_PROCESS_POOLS``
+    When set, :func:`CloseProcessPools` skips process-pool shutdown.  Normally
+    unnecessary because :func:`ReleaseStagePools` already preserves process pools across
+    stages; use only for advanced debugging or custom teardown.
 
 Optimization
 ------------
@@ -173,7 +224,12 @@ _PoolFactoryParams = ParamSpec("_PoolFactoryParams")
 
 
 class PoolKind(Enum):
-    """Whether a pool primarily uses in-process threads (GIL) or worker processes."""
+    """Whether a pool uses in-process workers or separate OS worker processes.
+
+    Used by selective wait/shutdown helpers.  ``THREAD`` includes vanilla
+    ``ThreadPool``, subprocess ``ProcessPool``, and ``SerialPool``.  ``PROCESS``
+    includes ``MultiprocessThreadPool``, ``LocalMachinePool``, and cluster backends.
+    """
 
     THREAD = "thread"
     PROCESS = "process"
@@ -303,25 +359,42 @@ def __CreatePoolFromFactory(pool_factory: PoolFactory[_PoolFactoryParams],
 
 
 def WaitOnAllPools() -> None:
-    """Wait for all known pools to finish queued work without shutting them down."""
+    """Block until all known pools finish queued work without shutting them down.
+
+    Use when later code on the same thread will enqueue more tasks and you do not
+    need to release idle thread-pool workers.  Pipeline stage boundaries should
+    prefer :func:`ReleaseStagePools` instead.
+    """
     _log_pool_diag("WaitOnAllPools")
     _wait_pools(None)
 
 
 def WaitOnThreadPools() -> None:
-    """Wait for in-process thread pools to finish without shutting them down."""
+    """Block until thread-kind pools finish without shutting them down.
+
+    Thread-kind pools are in-process (see :class:`PoolKind`).  This does not wait on
+    multiprocessing worker pools.
+    """
     _log_pool_diag("WaitOnThreadPools")
     _wait_pools(PoolKind.THREAD)
 
 
 def WaitOnProcessPools() -> None:
-    """Wait for process-backed pools to finish without shutting them down."""
+    """Block until process-kind pools finish without shutting them down.
+
+    Process-kind pools use OS worker processes (see :class:`PoolKind`).  Waiting does
+    not destroy workers; they remain available for new tasks.
+    """
     _log_pool_diag("WaitOnProcessPools")
     _wait_pools(PoolKind.PROCESS)
 
 
 def CloseThreadPools(*, skip_wait: bool = False) -> None:
-    """Shut down thread pools after optionally waiting for their tasks to complete."""
+    """Shut down thread-kind pools after optionally waiting for their tasks.
+
+    :param skip_wait: When ``True``, assume callers already waited (as
+        :func:`ReleaseStagePools` does via :func:`WaitOnAllPools`).
+    """
     _log_pool_diag("CloseThreadPools")
     if not skip_wait:
         _wait_pools(PoolKind.THREAD)
@@ -329,7 +402,12 @@ def CloseThreadPools(*, skip_wait: bool = False) -> None:
 
 
 def CloseProcessPools() -> None:
-    """Shut down process pools after waiting; skipped when NORNIR_KEEP_PROCESS_POOLS is set."""
+    """Shut down process-kind pools after waiting for their tasks.
+
+    No-op when ``NORNIR_KEEP_PROCESS_POOLS`` is set.  Production pipelines normally
+    call :func:`ReleaseStagePools` at stage boundaries instead, which leaves process
+    pools registered.
+    """
     _log_pool_diag("CloseProcessPools")
     _wait_pools(PoolKind.PROCESS)
     if _keep_process_pools():
@@ -338,10 +416,48 @@ def CloseProcessPools() -> None:
 
 
 def ReleaseStagePools() -> None:
-    """Wait for all pool work, then shut down thread pools only (reuse process pools)."""
+    """Synchronize a pipeline stage and release in-process pool workers.
+
+    Waits for all thread- and process-pool tasks to complete, then shuts down
+    thread-kind pools only.  Process-kind pools stay registered so later stages reuse
+    warm worker processes instead of paying fork/spawn cost again.
+
+    Call at production stage boundaries (import complete, registration transform
+    saved, stos overlay assembly done, pipeline ``Execute`` finished).  Full pool
+    teardown belongs in :func:`ClosePools` at process or test exit.
+    """
     _log_pool_diag("ReleaseStagePools")
     WaitOnAllPools()
     CloseThreadPools(skip_wait=True)
+
+
+def _terminate_process_pool_workers(pool: IPool) -> None:
+    """Force-terminate multiprocessing workers when a pool supports it."""
+    terminate = getattr(pool, "terminate_workers", None)
+    if callable(terminate):
+        terminate()
+        return
+    nested_mt = getattr(pool, "_mtpool", None)
+    if nested_mt is not None:
+        _terminate_process_pool_workers(nested_mt)
+    nested_pp = getattr(pool, "_ppool", None)
+    if nested_pp is not None:
+        nested_pp.shutdown()
+
+
+def FastClosePools() -> None:
+    """Shut down all pools, force-terminating process workers when supported.
+
+    Intended for faster test teardown when graceful multiprocessing ``join`` is too
+    slow.  Production pipelines should use :func:`ReleaseStagePools` between stages
+    and :func:`ClosePools` at exit instead.
+    """
+    _log_pool_diag("FastClosePools")
+    WaitOnAllPools()
+    for _, pool in _snapshot_pools():
+        if _pool_kind(pool) == PoolKind.PROCESS:
+            _terminate_process_pool_workers(pool)
+    _shutdown_pools(None)
 
 
 def _remove_pool(p: str | IPool):
@@ -360,7 +476,12 @@ def _remove_pool(p: str | IPool):
 
 @atexit.register
 def ClosePools() -> None:
-    """Shut down all known pools (wait for tasks, then destroy workers)."""
+    """Shut down all known pools (wait for tasks, then destroy all workers).
+
+    Registered as an ``atexit`` handler.  Tests and short scripts should also call
+    this explicitly at teardown.  Long pipelines should use :func:`ReleaseStagePools`
+    between stages and reserve this for final cleanup.
+    """
     global profiler
 
     _log_pool_diag("ClosePools")

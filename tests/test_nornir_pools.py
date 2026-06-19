@@ -442,6 +442,13 @@ class TestSelectivePoolShutdown(unittest.TestCase):
         self.assertNotIn("ReleaseThreadPool", remaining)
         self.assertIn("ReleaseProcessPool", remaining)
 
+    def test_fast_close_pools_clears_registry(self) -> None:
+        """FastClosePools waits and removes all pools from the registry."""
+        pools.GetThreadPool("FastCloseThreadPool", num_threads=2)
+        pools.GetMultithreadingPool("FastCloseProcessPool", num_threads=2)
+        pools.FastClosePools()
+        self.assertEqual(set(pools.dictKnownPools.keys()), set())
+
 
 if __name__ == "__main__":
     # import syssys.argv = ['', 'Test.testpools']
