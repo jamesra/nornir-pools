@@ -94,7 +94,7 @@ class Task(ABC):
 
         :raises Exception: Exceptions raised during task execution are re-raised on the thread calling wait_return
         """
-        raise Exception("Not implemented")
+        raise NotImplementedError()
 
     @abstractmethod
     def iscompleted(self) -> bool:

@@ -16,6 +16,24 @@ class LocalMachinePool(poolbase.PoolBase):
     '''
 
     @property
+    def queued_tasks(self) -> int:
+        total = 0
+        if self._mtpool is not None:
+            total += self._mtpool.queued_tasks
+        if self._ppool is not None:
+            total += self._ppool.queued_tasks
+        return total
+
+    @property
+    def active_tasks(self) -> int:
+        total = 0
+        if self._mtpool is not None:
+            total += self._mtpool.active_tasks
+        if self._ppool is not None:
+            total += self._ppool.active_tasks
+        return total
+
+    @property
     def num_active_tasks(self):
         total = 0
         if self._mtpool is not None:

@@ -35,35 +35,25 @@ class ImmediateProcessTask(task.TaskWithEvent):
         self.returned_value = None  # type: Any
         self.stdoutdata: str
         self.stderrdata: str
-        self.Run()
+        # Process is started by the Worker thread — do not Popen here or the command runs twice.
 
     def Run(self):
         self.proc = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *self.args,
                                      **self.kwargs)
 
     def wait(self):
-        if self.proc is None:
-            return
-
-        self.returned_value = self.proc.communicate()
-        self._handle_proc_completion()
+        # Wait for the pool worker to finish (sets completed + returncode/stdout).
+        super(ImmediateProcessTask, self).wait()
 
         if self.exception is not None:
             raise self.exception
         elif self.returncode < 0:
             raise Exception("Negative return code from task but no exception detail provided")
-
-        self.proc = None
         return
 
     @property
     def iscompleted(self):
-        if self.proc:
-            if self.proc.poll() is not None:
-                self.wait()
-                return True
-            else:
-                return False
+        return self.completed.is_set()
 
     def _handle_proc_completion(self):
 
@@ -109,12 +99,14 @@ class Worker(threading.Thread):
                  deadthreadqueue: queue.Queue,
                  shutdown_event: threading.Event,
                  queue_wait_time: float,
+                 pool: poolbase.LocalThreadPoolBase | None = None,
                  **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
         self.deadthreadqueue = deadthreadqueue
         self.shutdown_event = shutdown_event
+        self.pool = pool
         self.daemon = True
         self.queue_wait_time = queue_wait_time
         # self.logger = logging.getLogger(__name__)
@@ -131,7 +123,7 @@ class Worker(threading.Thread):
             try:
                 entry = self.tasks.get(True,
                                        self.queue_wait_time)  # Wait five seconds for a new entry in the queue and check if we should shutdown if nothing shows up
-            except:
+            except queue.Empty:
                 # Check if we should kill the thread
                 if self.shutdown_event.is_set():
                     # _sprint ("Queue Empty, exiting worker thread")
@@ -151,13 +143,24 @@ class Worker(threading.Thread):
 
             # do it!
 
+            if self.pool is not None:
+                self.pool.mark_task_started()
             try:
+                if not isinstance(entry.cmd, str):
+                    raise TypeError(
+                        f"ProcessPool Worker expected a shell command string, got {type(entry.cmd)!r}"
+                    )
                 proc = subprocess.Popen(entry.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *entry.args,
                                         **entry.kwargs)
                 stdout_bytes, stderr_bytes = proc.communicate()
                 entry.returned_value = (stdout_bytes, stderr_bytes)
                 entry.stdoutdata = stdout_bytes.decode('utf-8') if isinstance(stdout_bytes, bytes) else stdout_bytes
                 entry.stderrdata = stderr_bytes.decode('utf-8') if isinstance(stderr_bytes, bytes) else stderr_bytes
+                entry.returncode = proc.returncode
+                if entry.returncode != 0 and entry.exception is None:
+                    entry.exception = subprocess.CalledProcessError(
+                        entry.returncode, entry.cmd, output=stdout_bytes, stderr=stderr_bytes)
+                entry.set_completion_time()
                 proc = None
 
             except Exception as e:
@@ -175,6 +178,10 @@ class Worker(threading.Thread):
                 entry.returned_value = None
                 entry.returncode = -1
                 entry.stderrdata = None
+                entry.set_completion_time()
+            finally:
+                if self.pool is not None:
+                    self.pool.mark_task_finished()
 
             # calculate finishing time and mark task as completed
 
@@ -213,7 +220,7 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
     """Pool of threads consuming tasks from a queue"""
 
     def add_task(self, name: str, func: Callable, *args, **kwargs):
-        self.add_process(name, func, *args, **kwargs)
+        return self.add_process(name, func, *args, **kwargs)
 
     def __init__(self, name: str, num_workers: int | None = None, WorkerCheckInterval=0.5):
         '''
@@ -226,7 +233,13 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
         # self.logger.warn("Creating Process Pool")
 
     def add_worker_thread(self) -> Worker:
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, float(self.WorkerCheckInterval or 0.0))
+        w = Worker(
+            self.tasks,
+            self.deadthreadqueue,
+            self.shutdown_event,
+            float(self.WorkerCheckInterval or 0.0),
+            pool=self,
+        )
         w.name = "Process pool #%d" % self._next_thread_id
         self._next_thread_id += 1
         return w
@@ -256,7 +269,10 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
         if isinstance(func, str):
             entry = ImmediateProcessTask(name, func, *args, **kwargs)
         elif callable(func):
-            entry = ProcessTask(name, func, *args, **kwargs)
+            raise NotImplementedError(
+                "ProcessPool does not run Python callables in a child process; "
+                "pass a shell command string, or use MultiprocessThreadPool.add_task for callables."
+            )
         elif func is None:
             info = f"Process pool add task {name} called with 'None' as function"
             prettyoutput.LogErr(info)
@@ -268,4 +284,5 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
 
         self.tasks.put(entry)
         self.add_threads_if_needed()
+        self.TryReportPoolLoad()
         return entry

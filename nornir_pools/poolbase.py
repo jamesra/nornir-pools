@@ -26,6 +26,21 @@ class PoolBase(IPool):
 
         return self._logger
 
+    @property
+    def queued_tasks(self) -> int:
+        """Tasks waiting to start. Override in subclasses with a queue."""
+        return 0
+
+    @property
+    def active_tasks(self) -> int:
+        """Tasks currently executing. Override when in-flight is tracked."""
+        return 0
+
+    @property
+    def max_workers(self) -> int | None:
+        """Worker capacity when known."""
+        return None
+
     def __str__(self):
         return "Pool {0} with {1} active tasks".format(self.name, self.num_active_tasks)
 
@@ -36,11 +51,14 @@ class PoolBase(IPool):
         self._last_job_report_time = time.time()
         self.job_report_interval_in_seconds = kwargs.get("job_report_interval", 10.0)
         self._last_num_active_tasks = 0
+        self._mqtt_report_interval_in_seconds = float(kwargs.get("mqtt_job_report_interval", 0.75))
 
     def TryReportActiveTaskCount(self):
         '''
         Report the current job count if we haven't reported it recently
         '''
+        self.TryReportPoolLoad()
+
         if self.num_active_tasks < 2 and self._last_num_active_tasks < 2:
             return
 
@@ -50,6 +68,20 @@ class PoolBase(IPool):
             self._last_job_report_time = now
             self._last_num_active_tasks = self.num_active_tasks
             self.PrintActiveTaskCount()
+
+    def TryReportPoolLoad(self) -> None:
+        """Publish dashboard ``pool_load`` for this pool (throttled in shared helper)."""
+        try:
+            from nornir_shared.pool_load import report_pool_load
+        except ImportError:
+            return
+        report_pool_load(
+            self.name,
+            queued=self.queued_tasks,
+            active=self.active_tasks,
+            max_workers=self.max_workers,
+            interval_s=self._mqtt_report_interval_in_seconds,
+        )
 
     def PrintActiveTaskCount(self):
         JobQText = "Jobs Queued: " + str(self.num_active_tasks)
@@ -66,8 +98,34 @@ class LocalThreadPoolBase(PoolBase, ABC):
     AtExitLock = threading.Lock()
 
     @property
-    def num_active_tasks(self) -> int:
+    def queued_tasks(self) -> int:
         return self.tasks.qsize()
+
+    @property
+    def active_tasks(self) -> int:
+        with self._inflight_lock:
+            return self._inflight
+
+    @property
+    def num_active_tasks(self) -> int:
+        return self.queued_tasks + self.active_tasks
+
+    @property
+    def max_workers(self) -> int | None:
+        return self._max_threads
+
+    def mark_task_started(self) -> None:
+        """Called by a worker when it dequeues a task to run."""
+        with self._inflight_lock:
+            self._inflight += 1
+        self.TryReportPoolLoad()
+
+    def mark_task_finished(self) -> None:
+        """Called by a worker when a dequeued task finishes."""
+        with self._inflight_lock:
+            if self._inflight > 0:
+                self._inflight -= 1
+        self.TryReportPoolLoad()
 
     @classmethod
     def TryRegisterAtExit(cls, wait_time: float):
@@ -96,6 +154,8 @@ class LocalThreadPoolBase(PoolBase, ABC):
         self.shutdown_event.clear()
         # self.keep_alive_thread = None
         self._threads = []
+        self._inflight = 0
+        self._inflight_lock = threading.Lock()
 
         self.WorkerCheckInterval = kwargs.get('WorkerCheckInterval', None)
         if self.WorkerCheckInterval is None:
@@ -163,7 +223,7 @@ class LocalThreadPoolBase(PoolBase, ABC):
                 if t is None:
                     break
                 else:
-                    for i in range(len(self._threads) - 1, 0, -1):
+                    for i in range(len(self._threads) - 1, -1, -1):
                         if t == self._threads[i]:
                             del self._threads[i]
                             break
@@ -180,5 +240,3 @@ class LocalThreadPoolBase(PoolBase, ABC):
 
         self.tasks.join()
         self.remove_finished_threads()
-
-

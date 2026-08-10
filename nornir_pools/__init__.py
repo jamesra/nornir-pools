@@ -33,6 +33,15 @@ Pool creation functions share a common signature
 .. autofunction:: GetProcessPool
 .. autofunction:: GetParallelPythonPool
 
+Dashboard pool load
+-------------------
+
+``nornir_pools`` publishes ``pool_load`` MQTT events (via
+``nornir_shared.pool_load.report_pool_load``) so the build dashboard can show a
+thin **Pools** section. Ad hoc ``concurrent.futures`` work can use
+:class:`nornir_pools.InstrumentedThreadPoolExecutor` or call ``report_pool_load``
+directly.
+
 Global pools
 ------------
 
@@ -146,6 +155,7 @@ import nornir_pools.shared_memory as shared_memory
 import nornir_pools.task as task
 import nornir_pools.threadpool as threadpool
 from nornir_pools.ipool import IPool
+from nornir_pools.instrumented_executor import InstrumentedThreadPoolExecutor
 from nornir_pools.shared_memory import get_or_create_shared_memory_manager
 from nornir_pools.task import Task
 from nornir_shared import misc as nornir_logging_misc

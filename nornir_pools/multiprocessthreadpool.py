@@ -300,8 +300,21 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         return self._lock
 
     @property
+    def queued_tasks(self) -> int:
+        # apply_async jobs are not separable into queue vs running from the parent.
+        return 0
+
+    @property
+    def active_tasks(self) -> int:
+        return len(self._active_tasks)
+
+    @property
     def num_active_tasks(self) -> int:
         return len(self._active_tasks)
+
+    @property
+    def max_workers(self) -> int | None:
+        return self._num_processes
 
     def __init__(self, name: str, num_workers: int | None = None, maxtasksperchild: int | None = None,
                  authkey: bytes | None = None,
@@ -325,10 +338,10 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         super(MultiprocessThreadPool, self).__init__(name=name, *args, **kwargs)
 
     def shutdown(self):
-        if hasattr(self, 'tasks'):
-            self.tasks.close()
-            self.tasks.join()
+        if self._tasks is not None:
             self.wait_completion()
+            self._tasks.close()
+            self._tasks.join()
 
             assert (len(self._active_tasks) == 0)
             self._tasks = None
@@ -384,17 +397,19 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         # The returned task seems valid and not complete, but the MultiprocessThreadTask's event is never set because the callback isn't used.
         # This hangs the caller if they wait on the task.
 
-        retval_task = MultiprocessThreadTask(name, None, args, kwargs)
+        retval_task = MultiprocessThreadTask(name, None, *args, **kwargs)
+        # Register before apply_async so a fast callback cannot race past _active_tasks.
+        self._active_tasks[retval_task.task_id] = retval_task
         retval_task.asyncresult = self.tasks.apply_async(func, args, kwargs,  # type: ignore[attr-defined]
                                                          callback=self.callback_wrapper(retval_task.task_id,
                                                                                         retval_task.callback),
                                                          error_callback=self.callback_wrapper(retval_task.task_id,
                                                                                               retval_task.callbackontaskfail))
         if retval_task.asyncresult is None:
+            del self._active_tasks[retval_task.task_id]
             raise ValueError("apply_async returned None instead of an asyncresult object")
 
         retval_task.asyncresult._nornir_task_id_ = retval_task.task_id
-        self._active_tasks[retval_task.task_id] = retval_task
         # print("Added task #{0}".format(retval_task.task_id))
 
         self.TryReportActiveTaskCount()

@@ -72,12 +72,14 @@ class Worker(threading.Thread):
                  deadthreadqueue: queue.Queue,
                  shutdown_event: threading.Event,
                  queue_wait_time: float,
+                 pool: poolbase.LocalThreadPoolBase | None = None,
                  **kwargs):
 
         threading.Thread.__init__(self, **kwargs)
         self.tasks = tasks
         self.deadthreadqueue = deadthreadqueue
         self.shutdown_event = shutdown_event
+        self.pool = pool
         self.daemon = True
 
         if queue_wait_time is None:
@@ -138,6 +140,8 @@ class Worker(threading.Thread):
             original_thread_name = self.name
             self.name = entry.name
 
+            if self.pool is not None:
+                self.pool.mark_task_started()
             try:
 
                 if len(entry.args) > 0 and len(entry.kwargs) > 0:
@@ -159,26 +163,12 @@ class Worker(threading.Thread):
                 # self.logger.error(error_message)
                 # sys.stderr.write(error_message)
                 pass
-
-            # calculate finishing time and mark task as completed
-
-            # task_end_time = time.time()
+            finally:
+                if self.pool is not None:
+                    self.pool.mark_task_finished()
 
             # mark the object event as completed
             entry.completed.set()
-
-            # print the completion notice with times aligned
-            # t_delta = task_end_time - task_start_time
-            # out_string = generate_elapsed_time_str(entry.name, t_delta)
-            # self.logger.info(out_string)
-            # #########
-            #             JobsQueued = self.tasks.qsize()
-            #             if JobsQueued > 0:
-            #
-            #                 JobQText = "Jobs Queued: " + str(self.tasks.qsize())
-            #                 JobQText = ('\b' * 40) + JobQText + (' ' * (40 - len(JobQText)))
-            #                 nornir_pools._PrintProgressUpdate(JobQText)
-            ###########
 
             self.tasks.task_done()
 
@@ -217,7 +207,14 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         assert (self.shutdown_event.is_set() is False)
 
         worker_name = "Thread pool #%d" % self._next_thread_id
-        w = Worker(self.tasks, self.deadthreadqueue, self.shutdown_event, float(self.WorkerCheckInterval or 0.0), name=worker_name)
+        w = Worker(
+            self.tasks,
+            self.deadthreadqueue,
+            self.shutdown_event,
+            float(self.WorkerCheckInterval or 0.0),
+            pool=self,
+            name=worker_name,
+        )
         self._next_thread_id += 1
         return w
 
@@ -241,6 +238,7 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         entry = ThreadTask(name, func, *args, **kwargs)
         self.tasks.put(entry)
         self.add_threads_if_needed()
+        self.TryReportPoolLoad()
         return entry
 
 
