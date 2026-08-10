@@ -8,6 +8,7 @@
 import socket
 import subprocess
 import sys
+import threading
 import time
 import traceback
 from typing import Any
@@ -17,24 +18,20 @@ from . import poolbase
 from . import task
 
 NextGroupName = 0
-# JobCountLock = Lock()
+_JobCountLock = threading.Lock()
 ActiveJobCount = 0
 
 
 def IncrementActiveJobCount():
-    # global JobCountLock
     global ActiveJobCount
-    # JobCountLock.acquire(True)
-    ActiveJobCount += 1
-    # JobCountLock.release()
+    with _JobCountLock:
+        ActiveJobCount += 1
 
 
 def DecrementActiveJobCount():
-    # global JobCountLock
     global ActiveJobCount
-    # JobCountLock.acquire(True)
-    ActiveJobCount -= 1
-    # JobCountLock.release()
+    with _JobCountLock:
+        ActiveJobCount -= 1
 
 
 def PrintJobsCount():
@@ -257,13 +254,15 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
 
         IncrementActiveJobCount()
 
-        taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
+        with _JobCountLock:
+            group_name = NextGroupName
+            NextGroupName += 1
+
+        taskObj = CTask(self.server, group_name, name, *args, **kwargs)
         ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback,
-                                    globals=globals(), group=str(NextGroupName),
+                                    globals=globals(), group=str(group_name),
                                     modules=('socket', 'traceback', 'subprocess', 'sys'))
         taskObj.ppTask = ppTask  # type: ignore[attr-defined]
-
-        NextGroupName += 1
 
         PrintJobsCount()
 
@@ -284,13 +283,15 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         kwargs['stderr'] = subprocess.PIPE
         kwargs['shell'] = True
 
-        taskObj = CTask(self.server, NextGroupName, name, *args, **kwargs)
+        with _JobCountLock:
+            group_name = NextGroupName
+            NextGroupName += 1
+
+        taskObj = CTask(self.server, group_name, name, *args, **kwargs)
         ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback,
-                                    globals=globals(), group=str(NextGroupName),
+                                    globals=globals(), group=str(group_name),
                                     modules=('socket', 'traceback', 'subprocess', 'sys'))
         taskObj.ppTask = ppTask  # type: ignore[attr-defined]
-
-        NextGroupName += 1
 
         PrintJobsCount()
 
