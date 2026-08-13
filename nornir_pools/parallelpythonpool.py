@@ -43,6 +43,11 @@ def PrintJobsCount():
 
 class CTask(task.TaskWithEvent):
 
+    #: Seconds to wait for the PP callback after ``server.wait`` returns.
+    PRIMARY_CALLBACK_TIMEOUT_S = 300.0
+    #: Extra seconds before failing when the primary wait expires without a callback.
+    SECONDARY_CALLBACK_TIMEOUT_S = 60.0
+
     @property
     def server(self):
         return self._server
@@ -57,6 +62,14 @@ class CTask(task.TaskWithEvent):
         self._server = server
         self._groupname = groupname
         self._callback_reached = False
+        self._job_count_released = False
+
+    def _release_job_count_once(self) -> None:
+        """Decrement ActiveJobCount at most once (callback or wait timeout)."""
+        if self._job_count_released:
+            return
+        self._job_count_released = True
+        DecrementActiveJobCount()
 
     def callback(self, *args, **kwargs):
         '''Function called when a remote process call returns'''
@@ -69,7 +82,7 @@ class CTask(task.TaskWithEvent):
         if 'error_message' in self.__dict__:
             sys.stderr.write(self.error_message)  # type: ignore[attr-defined]
 
-        DecrementActiveJobCount()
+        self._release_job_count_once()
 
         PrintJobsCount()
 
@@ -81,22 +94,24 @@ class CTask(task.TaskWithEvent):
         self.server.wait(self.groupname)
 
         # The job is done, so there is no reason for this to take more than five minutes unless an error occurred and the callback will not be reached
-        self.completed.wait(300)
+        self.completed.wait(self.PRIMARY_CALLBACK_TIMEOUT_S)
 
         if not self._callback_reached:
             nornir_pools._PrintWarning(
                 "Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
             nornir_pools._PrintWarning(
-                "We are now going to waiting forever for the callback.  If CPU use is low this likely means the process has hung and needs restarting or debugging.")
-            self.completed.wait()
-            # raise Exception("Server wait returned without a callback being called.  This usually indicates a missing package on the remote.")
-            self.completed.set()
+                f"Waiting up to {self.SECONDARY_CALLBACK_TIMEOUT_S:.0f}s more for the callback "
+                "(then fail-fast and unwind ActiveJobCount).")
+            if not self.completed.wait(self.SECONDARY_CALLBACK_TIMEOUT_S):
+                nornir_pools._PrintWarning(
+                    "PP callback never arrived; releasing ActiveJobCount and failing the wait.")
+                self._release_job_count_once()
+                self.completed.set()
+                raise RuntimeError(
+                    "ParallelPython task callback was not reached after server.wait; "
+                    "ActiveJobCount was unwound to avoid a permanent leak.")
 
         super(CTask, self).wait()
-
-        # PP is a bit strange in that the callback only occurs if the remote process does not raise an exception
-        # if not self.completed.is_set():
-        #    self.callback()
 
         # If we failed the call.  Check for an exception and raise if present
         if hasattr(self, 'exception'):
