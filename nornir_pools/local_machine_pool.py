@@ -7,6 +7,7 @@ Created on Apr 17, 2014
 import nornir_pools
 import nornir_shared.misc
 import logging
+from typing import Callable
 from . import poolbase
 
 
@@ -85,6 +86,10 @@ class LocalMachinePool(poolbase.PoolBase):
 
     def add_task(self, name, func, *args, **kwargs) -> nornir_pools.task.Task:
         return self._multithreading_pool.add_task(name, func, *args, **kwargs)
+
+    def warm(self, func: Callable | None = None) -> None:
+        """Spawn process workers (and run *func* once each) before the first real task."""
+        self._multithreading_pool.warm(func)
 
     def add_process(self, name, func, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:
         return self._process_pool.add_process(name, func, *args, **kwargs)

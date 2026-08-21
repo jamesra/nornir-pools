@@ -277,6 +277,11 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
         return self.asyncresult.ready()
 
 
+def _warmup_noop() -> None:
+    """Picklable no-op used to spawn and prime process-pool workers."""
+    return None
+
+
 class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     """Pool of threads consuming tasks from a queue"""
 
@@ -347,6 +352,13 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
             self._tasks = None
 
         nornir_pools._remove_pool(self)
+
+    def warm(self, func: Callable | None = None) -> None:
+        """Create workers and run *func* once per process so the first real task is not cold."""
+        worker = func if func is not None else _warmup_noop
+        _ = self.tasks
+        for index in range(int(self._num_processes)):
+            self.add_task(f"{self.name} warmup {index}", worker)
 
     def terminate_workers(self) -> None:
         """Terminate worker processes without waiting for graceful pool close (test teardown)."""
