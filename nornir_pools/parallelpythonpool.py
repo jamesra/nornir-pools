@@ -268,9 +268,17 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
             self._server = None
 
     @property
-    def ActiveTasks(self):
-        global ActiveJobCount
+    def num_active_tasks(self) -> int:
         return ActiveJobCount
+
+    @property
+    def ActiveTasks(self) -> int:
+        """Legacy alias for :attr:`num_active_tasks`.
+
+        Retained because nornir_buildmanager.operations.tile duck-types on this
+        name to throttle submission (`hasattr(pool, 'ActiveTasks')`).
+        """
+        return self.num_active_tasks
 
     def get_active_nodes(self):
 
