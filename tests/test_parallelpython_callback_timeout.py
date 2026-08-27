@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import unittest
 
 import nornir_pools.parallelpythonpool as pp
@@ -61,6 +62,37 @@ class TestParallelPythonCallbackTimeout(unittest.TestCase):
         # Second wait must not decrement again.
         task.wait()
         self.assertEqual(pp.ActiveJobCount, 0)
+
+    def test_concurrent_release_decrements_exactly_once(self) -> None:
+        """The timeout path and a late callback can claim the release together.
+
+        This pins the exactly-once invariant under concurrent claims. It is not
+        a regression test for the locking: the unsynchronized form also passed
+        here, including at a 1e-9 switch interval over 3000 attempts, because a
+        GIL-enabled interpreter rarely interleaves the check and the set. It
+        would fail on a free-threaded build, which is what the lock is for.
+        """
+        num_threads = 8
+
+        for attempt in range(100):
+            with self.subTest(attempt=attempt):
+                pp.ActiveJobCount = 0
+                pp.IncrementActiveJobCount()
+                task = pp.CTask(_FakeServer(), "group-race", name="race")
+
+                start = threading.Barrier(num_threads)
+
+                def claim() -> None:
+                    start.wait()
+                    task._release_job_count_once()
+
+                threads = [threading.Thread(target=claim) for _ in range(num_threads)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+
+                self.assertEqual(pp.ActiveJobCount, 0)
 
 
 if __name__ == "__main__":

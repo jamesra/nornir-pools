@@ -63,12 +63,30 @@ class CTask(task.TaskWithEvent):
         self._groupname = groupname
         self._callback_reached = False
         self._job_count_released = False
+        self._release_lock = threading.Lock()
 
     def _release_job_count_once(self) -> None:
-        """Decrement ActiveJobCount at most once (callback or wait timeout)."""
-        if self._job_count_released:
-            return
-        self._job_count_released = True
+        """Decrement ActiveJobCount at most once (callback or wait timeout).
+
+        The two callers race by design: the wait-timeout path gives up at the
+        same moment a late callback may arrive on a PP thread. A bare
+        check-then-set lets both observe the flag unset and double-decrement.
+
+        This is precautionary rather than an observed failure. Under a
+        GIL-enabled interpreter the unsynchronized form was not reproducibly
+        wrong, but nothing guarantees the two bytecodes stay uninterleaved, and
+        on a free-threaded build they genuinely can. The lock is uncontended and
+        taken once per task, so correctness here is close to free.
+
+        The decrement stays outside this lock because DecrementActiveJobCount
+        takes the module-wide _JobCountLock; releasing first keeps each thread
+        holding only one lock at a time.
+        """
+        with self._release_lock:
+            if self._job_count_released:
+                return
+            self._job_count_released = True
+
         DecrementActiveJobCount()
 
     def callback(self, *args, **kwargs):
