@@ -23,23 +23,28 @@ from . import task
 
 
 class ImmediateProcessTask(task.TaskWithEvent):
-    '''Launches processes without threads'''
+    """Handle for a shell command run by a ProcessPool Worker thread.
+
+    This object only carries the command and collects its outcome. Launching the
+    process, decoding its output and marking completion all belong to Worker.run.
+    """
     exception: Exception | None # Exception thrown by the process
     
 
     def __init__(self, name: str, func: str, *args, **kwargs):
         super(ImmediateProcessTask, self).__init__(name, *args, **kwargs)
         self.exception = None
-        self.proc = None  # type: subprocess.Popen | None
         self.cmd = func  # type: str
         self.returned_value = None  # type: Any
         self.stdoutdata: str
         self.stderrdata: str
-        # Process is started by the Worker thread — do not Popen here or the command runs twice.
-
-    def Run(self):
-        self.proc = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, *self.args,
-                                     **self.kwargs)
+        # No Popen here. A Run() method used to launch self.cmd a second time, and a
+        # _handle_proc_completion() re-decoded output Worker.run had already decoded and
+        # would have raised on a failed task, where Worker.run sets returned_value to
+        # None. Both were unreachable, and Run() was a standing invitation to
+        # reintroduce the double-spawn its own comment warned about, so they were
+        # removed rather than left as a trap. A vestigial self.proc went with them; only
+        # Run() ever assigned it.
 
     def wait(self):
         # Wait for the pool worker to finish (sets completed + returncode/stdout).
@@ -54,14 +59,6 @@ class ImmediateProcessTask(task.TaskWithEvent):
     @property
     def iscompleted(self):
         return self.completed.is_set()
-
-    def _handle_proc_completion(self):
-
-        self.stdoutdata = self.returned_value[0].decode('utf-8')
-        self.stderrdata = self.returned_value[1].decode('utf-8')
-
-        self.set_completion_time()
-        self.completed.set()
 
     def wait_return(self) -> str:
         self.wait()
