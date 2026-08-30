@@ -165,9 +165,13 @@ __ParallelPythonAvailable = False
 
 try:
     import nornir_pools.parallelpythonpool
-except ImportError as e:
+
+    # The module imports whether or not 'pp' is installed, so importing it proved
+    # nothing and this flag was left False unconditionally. Ask the module whether it
+    # actually has a cluster backend.
+    __ParallelPythonAvailable = nornir_pools.parallelpythonpool.ParallelPythonAvailable
+except ImportError:
     __ParallelPythonAvailable = False
-    pass
 
 dictKnownPools = {}
 

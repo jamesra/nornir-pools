@@ -17,6 +17,17 @@ import nornir_pools
 from . import poolbase
 from . import task
 
+try:
+    import pp  # type: ignore[import-not-found]
+
+    ParallelPythonAvailable = True
+except ImportError:
+    pp = None  # type: ignore[assignment]
+    #: False when the ``pp`` (Parallel Python) distribution is not installed. The module
+    #: still imports so callers can query this and so the pool class stays introspectable;
+    #: only building a server needs ``pp``.
+    ParallelPythonAvailable = False
+
 NextGroupName = 0
 _JobCountLock = threading.Lock()
 ActiveJobCount = 0
@@ -233,7 +244,18 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
     @property
     def server(self):
         if self._server is None:
-            self._server = pp.Server(ppservers=("*",))  # type: ignore[reportUndefinedVariable]
+            if not ParallelPythonAvailable:
+                # Previously this line dereferenced a module-level `pp` that was never
+                # imported, so the first submit died with "name 'pp' is not defined",
+                # which says nothing about the cluster backend being absent.
+                raise RuntimeError(
+                    "Parallel Python is not available: the 'pp' distribution is not "
+                    "installed, so this pool cannot create a cluster server. Use "
+                    "nornir_pools.GetGlobalLocalMachinePool() for local work, or check "
+                    "nornir_pools.IsParallelPythonAvailable() before requesting a "
+                    "cluster pool.")
+
+            self._server = pp.Server(ppservers=("*",))
             nornir_pools._pprint("Creating server pool, wait three seconds for other servers to respond")
             time.sleep(3)
 
@@ -293,17 +315,25 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
 
+        # Resolve the server before counting the job. Counting first meant a failure to
+        # build the server left ActiveJobCount incremented for a task that never existed,
+        # and wait_completion then blocked forever on "1 active tasks".
+        server = self.server
+
         IncrementActiveJobCount()
+        try:
+            with _JobCountLock:
+                group_name = NextGroupName
+                NextGroupName += 1
 
-        with _JobCountLock:
-            group_name = NextGroupName
-            NextGroupName += 1
-
-        taskObj = CTask(self.server, group_name, name, *args, **kwargs)
-        ppTask = self.server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback,
-                                    globals=globals(), group=str(group_name),
-                                    modules=('socket', 'traceback', 'subprocess', 'sys'))
-        taskObj.ppTask = ppTask  # type: ignore[attr-defined]
+            taskObj = CTask(server, group_name, name, *args, **kwargs)
+            ppTask = server.submit(func=RemoteFunction, args=(func, (args, kwargs)), callback=taskObj.callback,
+                                   globals=globals(), group=str(group_name),
+                                   modules=('socket', 'traceback', 'subprocess', 'sys'))
+            taskObj.ppTask = ppTask  # type: ignore[attr-defined]
+        except BaseException:
+            DecrementActiveJobCount()
+            raise
 
         PrintJobsCount()
 
@@ -318,21 +348,28 @@ class ParallelPythonProcess_Pool(poolbase.PoolBase):
         # Python will not shut down while non-daemon threads are alive.  When the queue empties the thread exits.
         # When items are added to the queue we create a new keep_alive_thread as needed
 
+        # See add_task: resolve the server before the job is counted so a missing cluster
+        # backend cannot leave a phantom task blocking wait_completion.
+        server = self.server
+
         IncrementActiveJobCount()
+        try:
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
+            kwargs['shell'] = True
 
-        kwargs['stdout'] = subprocess.PIPE
-        kwargs['stderr'] = subprocess.PIPE
-        kwargs['shell'] = True
+            with _JobCountLock:
+                group_name = NextGroupName
+                NextGroupName += 1
 
-        with _JobCountLock:
-            group_name = NextGroupName
-            NextGroupName += 1
-
-        taskObj = CTask(self.server, group_name, name, *args, **kwargs)
-        ppTask = self.server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback,
-                                    globals=globals(), group=str(group_name),
-                                    modules=('socket', 'traceback', 'subprocess', 'sys'))
-        taskObj.ppTask = ppTask  # type: ignore[attr-defined]
+            taskObj = CTask(server, group_name, name, *args, **kwargs)
+            ppTask = server.submit(RemoteWorkerProcess, args=(func, (args, kwargs)), callback=taskObj.callback,
+                                   globals=globals(), group=str(group_name),
+                                   modules=('socket', 'traceback', 'subprocess', 'sys'))
+            taskObj.ppTask = ppTask  # type: ignore[attr-defined]
+        except BaseException:
+            DecrementActiveJobCount()
+            raise
 
         PrintJobsCount()
 
