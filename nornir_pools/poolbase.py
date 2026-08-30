@@ -1,4 +1,5 @@
 import atexit
+import contextlib
 import logging
 import multiprocessing
 import queue
@@ -101,6 +102,12 @@ _QUEUE_ROOM_POLL_SECONDS = 0.05
 #: workers draining it used to be a silent hang.
 _QUEUE_FULL_WARN_SECONDS = 30.0
 
+#: How often a pool repeats its nested-wait warning. The pattern is legal and sometimes
+#: deliberate, so this is a fragility report, not an error, and it must not flood the log
+#: when a pool is used this way throughout a run. The deadlock escalation below ignores
+#: this interval.
+_NESTED_WAIT_WARN_INTERVAL_SECONDS = 60.0
+
 
 class LocalThreadPoolBase(PoolBase, ABC):
     '''Base class for pools that rely on local threads and a queue to dispatch jobs'''
@@ -199,6 +206,9 @@ class LocalThreadPoolBase(PoolBase, ABC):
         self._queue_capacity = (self._max_threads or 1) * _QUEUE_CAPACITY_PER_WORKER
         self._queue_room = threading.Condition()
         self._producers_waiting = 0
+        self._nested_waiters = 0
+        self._nested_wait_lock = threading.Lock()
+        self._last_nested_wait_warning = 0.0
         # self.task_exceptions = queue.Queue() #Tasks that raise an unhandled exception are added to this queue
 
     def called_from_pool_worker(self) -> bool:
@@ -208,6 +218,67 @@ class LocalThreadPoolBase(PoolBase, ABC):
         based on thread names or identity reuse.
         """
         return getattr(threading.current_thread(), 'pool', None) is self
+
+    @contextlib.contextmanager
+    def nested_wait_guard(self, task_name: str):
+        """Report a worker of this pool blocking on a task belonging to this same pool.
+
+        #85 removed the queue-capacity half of this hazard, so a worker submitting onto
+        its own pool is no longer throttled. Submitting is only half the pattern: a worker
+        that then *waits* for its child consumes the very worker the child needs, because
+        the child is queued behind the parent that is still occupying its thread. With
+        every worker doing this the pool cannot drain and is wedged permanently.
+
+        Nothing here changes that. Work-stealing or growing the pool would, but both are
+        material behavioural changes -- re-entrant execution on a thread that is mid-task
+        can surprise anything holding a lock, and growing breaks the ``num_threads``
+        contract that ``add_threads_if_needed`` accounts against. This makes the fragility
+        visible instead: a warning while it is merely wasteful, and an error once it is
+        provably a deadlock, naming the pool so the report points at the fix.
+
+        A no-op unless the caller really is one of this pool's workers, so the ordinary
+        outside-caller wait pays only one attribute lookup.
+        """
+        if not self.called_from_pool_worker():
+            yield
+            return
+
+        with self._nested_wait_lock:
+            self._nested_waiters += 1
+            waiters = self._nested_waiters
+
+        try:
+            self._report_nested_wait(task_name, waiters)
+            yield
+        finally:
+            with self._nested_wait_lock:
+                self._nested_waiters -= 1
+
+    def _report_nested_wait(self, task_name: str, waiters: int) -> None:
+        capacity = self._max_threads or 1
+        queued = self.queued_tasks
+
+        # Every worker is parked waiting on this pool and there is queued work none of
+        # them can reach. This is not a risk any more, it has happened.
+        if waiters >= capacity and queued > 0:
+            self.logger.error(
+                'Pool %s is deadlocked: all %d worker thread(s) are blocked waiting on '
+                'tasks from this same pool, and %d task(s) are queued with no worker left '
+                'to run them. Waiting on: %s. Submit the nested work to a different pool, '
+                'or wait for it from a thread that is not one of this pool\'s workers.',
+                self.name, capacity, queued, task_name)
+            return
+
+        now = time.monotonic()
+        if now - self._last_nested_wait_warning < _NESTED_WAIT_WARN_INTERVAL_SECONDS:
+            return
+        self._last_nested_wait_warning = now
+
+        self.logger.warning(
+            'Pool %s has a worker blocked waiting on a task from its own pool (%s). '
+            '%d of %d worker(s) are waiting this way, %d task(s) queued. This wastes a '
+            'worker and deadlocks the pool if every worker does it.',
+            self.name, task_name, waiters, capacity, queued)
 
     def enqueue_task(self, entry) -> None:
         """Queue a task, applying capacity only to producers outside the pool.

@@ -56,7 +56,21 @@ class ThreadTask(task.TaskWithEvent):
 
         """Wait for task to complete, does not return a value"""
 
-        super(ThreadTask, self).wait()
+        pool = self.pool
+        # called_from_pool_worker() is checked here as well as inside the guard so the
+        # ordinary outside-caller wait never pays to build the context manager's
+        # generator, which measured 0.87us per call -- worth avoiding in a primitive this
+        # hot. The guard re-checks, so it stays correct if called directly.
+        if pool is None or not pool.called_from_pool_worker():
+            super(ThreadTask, self).wait()
+        else:
+            # Reported on the shape of the call, not on whether it happened to block. A
+            # nested wait that wins the race and finds its child already finished is the
+            # same fragile call site as one that deadlocks; which way it goes is a timing
+            # accident, so skipping the report when the child got there first would hide
+            # exactly the sites worth finding. See #222.
+            with pool.nested_wait_guard(self.name):
+                super(ThreadTask, self).wait()
 
         if not self.exception is None:
             raise self.exception
@@ -236,6 +250,9 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         # When items are added to the queue we create a new keep_alive_thread as needed
 
         entry = ThreadTask(name, func, *args, **kwargs)
+        # Recorded so a later wait() can tell it is about to block one of this pool's own
+        # workers on this pool's own work.
+        entry.pool = self
         self.enqueue_task(entry)
         self.add_threads_if_needed()
         self.TryReportPoolLoad()

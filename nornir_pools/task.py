@@ -2,6 +2,7 @@ import datetime
 import math
 import threading
 import time
+import weakref
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -61,6 +62,24 @@ class Task(ABC):
         self.name = name  # name of the task, used for debugging
         self.task_start_time = time.monotonic()
         self.task_end_time = None
+        self._pool_ref = None
+
+    @property
+    def pool(self):
+        """The pool that created this task, or None if it did not record itself.
+
+        Held weakly: a task object outliving its pool must not keep the pool, and its
+        worker threads, alive. Set by the creating pool rather than passed to __init__,
+        because *args/**kwargs there belong to the task's function.
+
+        Knowing the owning pool is what lets a blocking wait notice that it is running on
+        one of that same pool's workers, which starves the worker the awaited task needs.
+        """
+        return None if self._pool_ref is None else self._pool_ref()
+
+    @pool.setter
+    def pool(self, value):
+        self._pool_ref = None if value is None else weakref.ref(value)
 
     def set_completion_time(self):
         """Marks the current time as the task completion time.  Will only set completion time on the first call."""
