@@ -20,8 +20,13 @@ class SerialPool(poolbase.PoolBase):
 
     @property
     def _process_pool(self):
+        # PoolBase exposes lowercase `name`; there is no `Name`. This read was spelled
+        # `self.Name` behind a type: ignore, so the checker was silenced on the one line
+        # it would have caught. Currently unreachable -- `_ppool` is only ever assigned
+        # non-None here, and wait_completion guards on it being non-None -- but the
+        # AttributeError is real if anything ever calls this.
         if self._ppool is None:
-            self._ppool = nornir_pools.GetProcessPool(self.Name + " process pool", self._num_threads)  # type: ignore[attr-defined]
+            self._ppool = nornir_pools.GetProcessPool(self.name + " process pool", self._num_threads)
 
         return self._ppool
 
