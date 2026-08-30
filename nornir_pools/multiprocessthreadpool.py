@@ -353,15 +353,30 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         super(MultiprocessThreadPool, self).__init__(name=name, *args, **kwargs)
 
     def shutdown(self):
-        if self._tasks is not None:
-            self.wait_completion()
-            self._tasks.close()
-            self._tasks.join()
+        try:
+            if self._tasks is not None:
+                self.wait_completion()
+                self._tasks.close()
+                self._tasks.join()
 
-            assert (len(self._active_tasks) == 0)
+                # wait_completion only returns once _active_tasks is empty, so this
+                # holds by construction and the previous bare assert could never
+                # observe a leak. It is a logged check rather than an assert so that it
+                # still reports under -O, names the tasks instead of failing bare, and
+                # does not abort teardown if wait_completion ever gains a bounded wait.
+                leaked = sorted(self._active_tasks)
+                if leaked:
+                    self.logger.error(
+                        "Pool {0} shut down with {1} task(s) still registered as active: "
+                        "{2}. Their completion callbacks never fired, so results may be "
+                        "lost.".format(self.name, len(leaked), leaked))
+        finally:
+            # Teardown has to finish even if the calls above raise. Without this, a
+            # failure left the pool in dictKnownPools wrapping a closed
+            # multiprocessing.Pool, so the next lookup by name handed out a dead pool.
+            self._active_tasks.clear()
             self._tasks = None
-
-        nornir_pools._remove_pool(self)
+            nornir_pools._remove_pool(self)
 
     def warm(self, func: Callable | None = None) -> None:
         """Create workers and run *func* once per process so the first real task is not cold."""
