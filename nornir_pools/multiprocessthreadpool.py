@@ -245,32 +245,42 @@ class MultiprocessThreadTask(nornir_pools.task.Task):
 
     def wait_return(self):
 
-        """Waits until the function has completed execution and returns the value returned by the function pointer"""
-        retval = self.asyncresult.get()
-        if self.asyncresult.successful():
-            # self.logger.info("Multiprocess successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(self.kwargs)
-            return retval
-        else:
+        """Waits until the function has completed execution and returns the value returned by the function pointer
+
+        :raises Exception: Exceptions raised during task execution are re-raised here
+        """
+        # get() re-raises the worker's exception, so the failure tail has to live in an
+        # except block. Written as "retval = get(); if successful(): ... else: return
+        # None", the else was unreachable: a failed task never reached the guard. That
+        # cost the error log, which wait() does emit, and advertised a None-on-failure
+        # result the code could not deliver.
+        try:
+            return self.asyncresult.get()
+        except Exception:
             self.logger.error(
                 "Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(
                     self.kwargs))
-            # self.callbackontaskfail(self) This is called by the get() function above
-            return None
+            # callbackontaskfail is invoked by get() above.
+            raise
 
     def wait(self):
 
-        """Wait for task to complete, does not return a value"""
+        """Wait for task to complete, does not return a value
+
+        :raises Exception: Exceptions raised during task execution are re-raised here
+        """
 
         self.asyncresult.wait()
         if self.asyncresult.successful():
             return
-        else:
-            self.logger.error(
-                "Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(
-                    self.kwargs))
-            # self.callbackontaskfail(self)
-            self.asyncresult.get()  # This should cause the original exception to be raised according to multiprocess documentation and trigger the error callback as well
-            return None
+
+        self.logger.error(
+            "Multiprocess call not successful: " + self.name + '\nargs: ' + str(self.args) + "\nkwargs: " + str(
+                self.kwargs))
+        # Raises the original exception and triggers the error callback. Nothing below
+        # this line runs, so wait() and wait_return() agree: both re-raise, as the
+        # abstract Task documents.
+        self.asyncresult.get()
 
     @property
     def iscompleted(self) -> bool:
