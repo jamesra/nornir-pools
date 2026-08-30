@@ -35,9 +35,11 @@ name, the next lookup handed out that dead pool.
 Teardown now runs in a ``finally``, and the dead assert became a logged check that
 survives ``-O`` and names the offending tasks.
 
-The busy-spin in ``wait_completion`` is the substantive bug this uncovered and is filed
-separately; fixing it means giving that loop a bounded wait, which is a material change
-to a path whose comments document a race it was tuned around.
+The busy-spin in ``wait_completion`` was the substantive bug this uncovered. It has since
+been fixed under #221: the loop now reaps an entry whose result has already arrived, which
+is what the stale fixture below constructs, so such an entry can no longer reach the leak
+check. The tests that exercise the check therefore stub ``wait_completion`` out --
+"returned without draining" is the only remaining route to it.
 """
 from __future__ import annotations
 
@@ -216,10 +218,11 @@ class TestLeakIsReportedNotAsserted(_DirectPoolFixture):
         task = pool.add_task('t', SquareTheNumber, 5)
         task.wait_return()
 
-        # Re-register after completion so the leak check has something to find without
-        # making wait_completion spin: patch it out, since its busy-spin on a stale
-        # entry is the separately filed bug.
-        pool.wait_completion = lambda: None  # type: ignore[method-assign]
+        # Re-register after completion so the leak check has something to find. Stubbing
+        # wait_completion is what makes the leak reachable at all: it now reaps a stale
+        # entry like this one (#221), so the stub stands in for the only remaining way the
+        # report can fire -- wait_completion returning without having drained.
+        pool.wait_completion = lambda *args, **kwargs: None  # type: ignore[method-assign]
         pool._active_tasks[task.task_id] = task
 
         with self.assertLogs(POOL_LOGGER, level='ERROR') as captured:
@@ -232,7 +235,7 @@ class TestLeakIsReportedNotAsserted(_DirectPoolFixture):
         pool = self._pool('test-leak-names-id')
         task = pool.add_task('t', SquareTheNumber, 5)
         task.wait_return()
-        pool.wait_completion = lambda: None  # type: ignore[method-assign]
+        pool.wait_completion = lambda *args, **kwargs: None  # type: ignore[method-assign]
         pool._active_tasks[task.task_id] = task
 
         with self.assertLogs(POOL_LOGGER, level='ERROR') as captured:
@@ -244,7 +247,7 @@ class TestLeakIsReportedNotAsserted(_DirectPoolFixture):
         pool = self._pool('test-leak-still-tears-down')
         task = pool.add_task('t', SquareTheNumber, 5)
         task.wait_return()
-        pool.wait_completion = lambda: None  # type: ignore[method-assign]
+        pool.wait_completion = lambda *args, **kwargs: None  # type: ignore[method-assign]
         pool._active_tasks[task.task_id] = task
 
         with self.assertLogs(POOL_LOGGER, level='ERROR'):

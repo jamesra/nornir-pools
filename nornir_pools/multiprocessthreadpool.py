@@ -13,12 +13,12 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Dict
 
 import nornir_pools
 import nornir_pools.task
-# import time
 import nornir_shared.misc
 from nornir_shared import prettyoutput
 
@@ -26,6 +26,37 @@ from nornir_shared import prettyoutput
 
 _profiler = None  # type: None | cProfile.Profile
 _worker_profiler_atexit_registered = False
+
+# How long wait_completion pauses when an iteration reaped nothing: a task registered by
+# add_task whose apply_async has not returned yet, or a ready-and-registered entry that
+# somehow survived reaping. Small enough to be invisible next to real task durations, large
+# enough that neither case can peg a core.
+_WAIT_COMPLETION_POLL_SECONDS = 0.05
+
+_SHUTDOWN_TIMEOUT_ENV = 'NORNIR_POOL_SHUTDOWN_TIMEOUT'
+
+
+def _shutdown_timeout() -> float | None:
+    """Seconds ``shutdown`` waits for tasks before forcing termination; ``None`` to wait forever.
+
+    Deliberately unbounded by default. From the parent process a task whose callback will
+    never fire is indistinguishable from a worker that is simply busy for a long time --
+    both are just an AsyncResult that is not ready -- so any finite default would
+    eventually kill legitimate long-running work, which is worse than the hang it avoids.
+    Operators who would rather lose a wedged task than a wedged teardown can set this.
+    """
+    raw = os.environ.get(_SHUTDOWN_TIMEOUT_ENV)
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        prettyoutput.LogErr(
+            f"{_SHUTDOWN_TIMEOUT_ENV} is not a number: {raw!r}. Waiting indefinitely instead.")
+        return None
+    if value <= 0:
+        return None
+    return value
 
 
 def _ensure_repo_root_on_worker_pythonpath() -> None:
@@ -355,7 +386,19 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     def shutdown(self):
         try:
             if self._tasks is not None:
-                self.wait_completion()
+                try:
+                    self.wait_completion(timeout=_shutdown_timeout())
+                except TimeoutError:
+                    # close()/join() would hang next on the same wedged task, so skip the
+                    # graceful path entirely and use the escape hatch. Teardown must not
+                    # raise, so this is logged rather than propagated; wait_completion has
+                    # already reported which task ids are stuck.
+                    self.logger.error(
+                        "Pool %s could not drain within its shutdown budget; terminating workers.",
+                        self.name)
+                    self.terminate_workers()
+                    return
+
                 self._tasks.close()
                 self._tasks.join()
 
@@ -398,23 +441,37 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
 
     def callback_wrapper(self, task_id: int, callback_func: Callable):
         def wrapper_function(result):
-            # if isinstance(retval_task, multiprocessing.pool.AsyncResult):
-            #    task_id = result._nornir_task_id_
-            #    if not result._nornir_task_id_ in self._active_tasks:
-            #        raise ValueError("Unexpected result received")
+            # Nothing in here may raise. multiprocessing runs this from the pool's
+            # _handle_results thread, and ApplyResult._set invokes it *before*
+            # AsyncResult._event.set(), so an exception escaping here is catastrophic
+            # rather than merely noisy. Measured on 3.14:
+            #
+            #   * _handle_results dies, so this task never becomes ready and any wait()
+            #     on it blocks forever
+            #   * every *later* task submitted to the same pool is stranded too, because
+            #     no thread is left to deliver results
+            #   * pool.terminate() then fails with "Cannot have cache with result_handler
+            #     not alive", which takes out terminate_workers() -- the forced escape
+            #     hatch this class relies on
+            #
+            # This used to raise ValueError when task_id was not in _active_tasks, which
+            # is why wait_completion could not safely pop an entry before waiting on it.
+            # Reporting instead of raising is what makes that loop fixable at all.
+            try:
+                if self._active_tasks.pop(task_id, None) is None:
+                    self.logger.warning(
+                        "Task %d was not listed in active tasks, but a result was received in pool %s. "
+                        "The task was most likely already reaped by wait_completion.",
+                        task_id, self.name)
 
-            #    del self._active_tasks[task_id]
-            if not task_id in self._active_tasks:
-                raise ValueError(
-                    "Task {0} not listed in active tasks, but a result was received in pool {1}...".format(task_id,
-                                                                                                           str(self)))
-
-            del self._active_tasks[task_id]
-            # print("Delete task {0}".format(task_id))
-
-            # else: Errors return an exception, which we can't easily trace back to a task
-            self.TryReportActiveTaskCount()
-            return callback_func(result)
+                self.TryReportActiveTaskCount()
+                return callback_func(result)
+            except Exception:
+                self.logger.exception(
+                    "Completion callback for task %d in pool %s raised. Suppressed so the pool's "
+                    "result handler survives; the task's own exception, if any, is still re-raised "
+                    "by wait()/wait_return().", task_id, self.name)
+                return None
 
         return wrapper_function
 
@@ -500,16 +557,76 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
     #         return retval_task
     #
 
-    def wait_completion(self):
+    def wait_completion(self, timeout: float | None = None):
 
-        """Wait for completion of all the tasks in the queue"""
-        # Never pop a task out of _active_tasks before waiting: the pool's result
-        # thread can deliver the outcome in that window, callback_wrapper would not
-        # find task_id, raise ValueError before AsyncResult._event.set(), and wait()
-        # would hang forever under multiprocess pool stress.
-        while len(self._active_tasks) > 0:
-            pending = list(self._active_tasks.values())
-            for task in pending:
+        """Wait for completion of all the tasks in the queue
+
+        :param timeout: Seconds to wait before giving up. ``None`` waits indefinitely.
+        :raises TimeoutError: If *timeout* elapses with tasks still registered. The
+            message names the stuck task ids.
+        :raises Exception: Exceptions raised during task execution are re-raised here,
+            as before.
+        """
+        # This loop used to be `while self._active_tasks: for task in ...: task.wait()`,
+        # with entries removed only by callback_wrapper. If a callback never fired the
+        # loop could not terminate, in either of two shapes: a task whose AsyncResult
+        # never completes blocked in wait() forever, or -- worse -- an entry whose result
+        # had already arrived made wait() return instantly and the while re-enter, burning
+        # a core indefinitely.
+        #
+        # The old comment here warned against popping an entry before waiting on it,
+        # because callback_wrapper raised ValueError on an unknown task_id, which killed
+        # the pool's result handler before it could set the AsyncResult's event. That is
+        # no longer true: callback_wrapper reports instead of raising, so reaping an entry
+        # ourselves is safe, and it is what guarantees this loop makes progress.
+        deadline = None if timeout is None else time.monotonic() + timeout
+
+        while self._active_tasks:
+            reaped_any = False
+
+            for task_id, task in list(self._active_tasks.items()):
+                remaining = None if deadline is None else deadline - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    break
+
+                if task.asyncresult is None:
+                    # add_task registers the task before apply_async returns, so a
+                    # concurrent waiter can see this window. Retry rather than dereference
+                    # None, which is what the previous task.wait() did here.
+                    continue
+
+                # Wait on the AsyncResult rather than task.wait() so a deadline can be
+                # honoured; task.wait() below still surfaces the worker's exception.
+                task.asyncresult.wait(remaining)
+                if not task.asyncresult.ready():
+                    continue  # Only reachable when a deadline cut the wait short.
+
+                # ready() only becomes true after _set has finished calling the callback,
+                # so if the entry is still here the callback did not remove it and never
+                # will. Popping is a no-op in the normal case and the loop's only exit in
+                # the stale case. The event is already set, so no waiter can be stranded.
+                self._active_tasks.pop(task_id, None)
+                reaped_any = True
                 task.wait()
+
+            if not self._active_tasks:
+                return
+
+            if deadline is not None and time.monotonic() >= deadline:
+                stuck = sorted(self._active_tasks)
+                self.logger.error(
+                    "Pool %s timed out after %.1fs waiting for %d task(s) whose completion "
+                    "callbacks never fired: %s. Their results are lost.",
+                    self.name, timeout, len(stuck), stuck)
+                raise TimeoutError(
+                    "Pool {0} timed out after {1}s waiting for {2} task(s): {3}".format(
+                        self.name, timeout, len(stuck), stuck))
+
+            if not reaped_any:
+                # Belt and braces. Reaping above should make every iteration either block
+                # or shrink the dict, but if a future change reintroduces a
+                # ready-and-registered entry this keeps it a slow wait rather than a
+                # pegged core.
+                time.sleep(_WAIT_COMPLETION_POLL_SECONDS)
 
 
