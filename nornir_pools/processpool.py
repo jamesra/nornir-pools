@@ -279,7 +279,7 @@ class ProcessPool(poolbase.LocalThreadPoolBase):
             prettyoutput.LogErr(info)
             raise ValueError(info)
 
-        self.tasks.put(entry)
+        self.enqueue_task(entry)
         self.add_threads_if_needed()
         self.TryReportPoolLoad()
         return entry

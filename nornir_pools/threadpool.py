@@ -236,7 +236,7 @@ class ThreadPool(poolbase.LocalThreadPoolBase):
         # When items are added to the queue we create a new keep_alive_thread as needed
 
         entry = ThreadTask(name, func, *args, **kwargs)
-        self.tasks.put(entry)
+        self.enqueue_task(entry)
         self.add_threads_if_needed()
         self.TryReportPoolLoad()
         return entry
