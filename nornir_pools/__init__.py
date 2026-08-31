@@ -188,11 +188,26 @@ def IsParallelPythonAvailable():
     return __ParallelPythonAvailable
 
 def init_pool_process(logging_queue=None, logging_level=None, the_lock=None):
-    """Worker initializer: configure queue logging. Optional ``the_lock`` sets ``shared_lock`` (legacy API)."""
+    """Worker initializer: configure queue logging and force the NumPy backend in workers.
+
+    Optional ``the_lock`` sets ``shared_lock`` (legacy API).
+    """
     global shared_lock
     shared_lock = the_lock
     if logging_queue is not None:
         nornir_logging_misc.ConfigureWorkerQueueLogging(log_queue=logging_queue, level=logging_level)
+
+    # Forked workers inherit the parent's active backend without re-running module
+    # import, so a GPU parent leaves them on CuPy and tile work would initialize CUDA
+    # inside a forked child. Imported here rather than at module scope because
+    # nornir_pools sits below nornir_imageregistration and must keep working when it is
+    # not installed. The call is a no-op in the main process.
+    try:
+        from nornir_imageregistration.computational_lib import ConfigureForkPoolWorker
+    except ImportError:
+        return
+
+    ConfigureForkPoolWorker()
 
 
 def ApplyOSThreadLimit(num_threads: int | None) -> int | None:
