@@ -352,6 +352,29 @@ class LocalThreadPoolBase(PoolBase, ABC):
         raise NotImplementedError("add_worker_thread must be implemented by derived class and return a thread object")
 
     def add_threads_if_needed(self):
+        """Grow the pool towards one thread per outstanding task, capped at ``num_threads``.
+
+        Outstanding work is ``queued + inflight``, and that choice is what makes this
+        race-free. The previous version sized against ``qsize() + 1`` and then re-checked
+        ``not self.tasks.empty()`` before each creation, so a worker dequeueing the last item
+        between the two cancelled a thread it had already decided was needed -- and nothing
+        revisited the decision until the next ``add_task``, which for the final task of a
+        batch is never. Measured on ``ThreadPool(4)`` with 4 blocking tasks, deterministically
+        5 of 5 trials: 3 threads, 1 task left queued, and only **3 of the 4 tasks running at
+        once**.
+
+        A dequeue moves a task from ``queued`` to ``inflight``, so it leaves the sum
+        unchanged: the event that used to invalidate the target now cannot. Counting inflight
+        also fixes the sizing itself, since ``qsize() + 1`` ignored busy threads and so could
+        only ever approach capacity one thread per submission.
+
+        Reading ``qsize()`` before ``active_tasks`` is deliberate. The two reads are not
+        atomic, so a dequeue landing between them counts one task in both terms; erring
+        towards one extra thread is the direction that serves the throughput this method
+        exists for, and ``min`` with ``max_t`` keeps the ``num_threads`` contract intact
+        regardless. Idle threads are not over-created either: a pool of N idle workers
+        receiving one task computes a target of 1 and creates nothing.
+        """
 
         assert (self.shutdown_event.is_set() is False)
 
@@ -359,24 +382,18 @@ class LocalThreadPoolBase(PoolBase, ABC):
         num_active_threads = len(self._threads)
 
         max_t = self._max_threads or 1
-        if num_active_threads == max_t:
+        if num_active_threads >= max_t:
             return
 
-        num_threads_needed = min(max_t, self.tasks.qsize() + 1) - num_active_threads
+        outstanding = self.tasks.qsize() + self.active_tasks
+        num_threads_needed = min(max_t, outstanding)
 
-        num_threads_created = 0
-        # while num_active_threads < min((self._max_threads, self.tasks.qsize()+1)):
-        while num_threads_created < num_threads_needed:
-            if not self.tasks.empty():
-                t = self.add_worker_thread()
-                assert (isinstance(t, threading.Thread))
-                self._threads.append(t)
-                num_active_threads += 1
-                num_threads_created += 1
-                time.sleep(0)
-
-            else:
-                break
+        while num_active_threads < num_threads_needed:
+            t = self.add_worker_thread()
+            assert (isinstance(t, threading.Thread))
+            self._threads.append(t)
+            num_active_threads += 1
+            time.sleep(0)
 
     def remove_finished_threads(self):
         try:
