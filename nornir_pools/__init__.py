@@ -321,14 +321,24 @@ def _snapshot_pools() -> list[tuple[str, IPool]]:
         return list(dictKnownPools.items())
 
 
-def _wait_pools(kind: PoolKind | None = None) -> None:
-    """Block until active tasks complete on pools of the given kind (or all pools)."""
+def _wait_pools(kind: PoolKind | None = None, timeout: float | None = None) -> None:
+    """Block until active tasks complete on pools of the given kind (or all pools).
+
+    :param timeout: Seconds to wait per pool before giving up. ``None`` waits
+        indefinitely. Forwarded only to pools whose ``wait_completion`` accepts a
+        ``timeout`` keyword; other pools keep their unbounded wait.
+    """
+    import inspect
     for key, pool in _snapshot_pools():
         if kind is not None and _pool_kind(pool) != kind:
             continue
         if pool.num_active_tasks > 0:
             _sprint("Waiting on pool: {0}".format(str(pool)))
-        pool.wait_completion()
+        wait = pool.wait_completion
+        if timeout is not None and "timeout" in inspect.signature(wait).parameters:
+            wait(timeout=timeout)
+        else:
+            wait()
 
 
 def _shutdown_pools(kind: PoolKind | None = None) -> None:
@@ -504,18 +514,43 @@ def _remove_pool(p: str | IPool):
 
 
 @atexit.register
-def ClosePools() -> None:
+def ClosePools(timeout: float | None = None) -> None:
     """Shut down all known pools (wait for tasks, then destroy all workers).
 
     Registered as an ``atexit`` handler.  Tests and short scripts should also call
     this explicitly at teardown.  Long pipelines should use :func:`ReleaseStagePools`
     between stages and reserve this for final cleanup.
+
+    :param timeout: Seconds to wait per pool before giving up. ``None`` (the default)
+        waits indefinitely, matching historical behaviour. Tests should pass a bound
+        so a leaked worker becomes a ``TimeoutError`` of that test rather than hanging
+        the whole suite. When a timeout is given it is also applied to each pool's
+        shutdown drain (via ``NORNIR_POOL_SHUTDOWN_TIMEOUT``), so a stuck worker is
+        terminated rather than blocking teardown a second time. Pools are shut down
+        even when the wait times out, so a later caller is not left facing the same
+        stuck registry entry.
     """
     global profiler
 
     _log_pool_diag("ClosePools")
-    _wait_pools(None)
-    _shutdown_pools(None)
+    previous_shutdown_timeout = os.environ.get('NORNIR_POOL_SHUTDOWN_TIMEOUT')
+    if timeout is not None:
+        os.environ['NORNIR_POOL_SHUTDOWN_TIMEOUT'] = str(timeout)
+    wait_error: BaseException | None = None
+    try:
+        try:
+            _wait_pools(None, timeout=timeout)
+        except TimeoutError as exc:
+            wait_error = exc
+        _shutdown_pools(None)
+    finally:
+        if timeout is not None:
+            if previous_shutdown_timeout is None:
+                os.environ.pop('NORNIR_POOL_SHUTDOWN_TIMEOUT', None)
+            else:
+                os.environ['NORNIR_POOL_SHUTDOWN_TIMEOUT'] = previous_shutdown_timeout
+    if wait_error is not None:
+        raise wait_error
 
 
 def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:

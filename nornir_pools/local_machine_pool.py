@@ -94,22 +94,30 @@ class LocalMachinePool(poolbase.PoolBase):
     def add_process(self, name, func, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:
         return self._process_pool.add_process(name, func, *args, **kwargs)
 
-    def wait_completion(self):
+    def wait_completion(self, timeout: float | None = None):
+        """Wait for completion of all the tasks in the queue.
 
-        """Wait for completion of all the tasks in the queue"""
-        if not self._mtpool is None:
-            self._mtpool.wait_completion()
+        :param timeout: Seconds to wait before giving up. ``None`` waits indefinitely.
+            Forwarded to the multiprocessing pool; the process pool has no timeout
+            parameter and is waited on only after the multiprocessing pool returns.
+        :raises TimeoutError: If *timeout* elapses with multiprocessing tasks still
+            registered. Their ids are named in the message.
+        """
+        if self._mtpool is not None:
+            self._mtpool.wait_completion(timeout=timeout)
 
-        if not self._ppool is None:
+        if self._ppool is not None:
             self._ppool.wait_completion()
 
     def shutdown(self):
-        self.wait_completion()
-
-        if not self._mtpool is None:
+        # Do not wait unbounded here. MultiprocessThreadPool.shutdown already waits with
+        # its own budget and terminates workers on timeout; a second unbounded wait in
+        # front of that would reintroduce the hang ClosePools(timeout=...) is meant to
+        # convert into a TimeoutError.
+        if self._mtpool is not None:
             self._mtpool.shutdown()
             self._mtpool = None
 
-        if not self._ppool is None:
+        if self._ppool is not None:
             self._ppool.shutdown()
             self._ppool = None
