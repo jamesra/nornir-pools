@@ -90,7 +90,9 @@ class Task(ABC):
         time_position = 70
         time_str = self.elapsed_time_str
         out_string = "--- {0}".format(self.name)
-        out_string += " " * (time_position - len(time_str))
+        pad = time_position - len(out_string)
+        if pad > 0:
+            out_string += " " * pad
         out_string += time_str
         return out_string
 
