@@ -7,8 +7,10 @@ Thread, process, and clustering pools with a shared interface for local or distr
 - Every `add_task` / `add_process` returns a **Task**. Callers always `wait` /
   `wait_return` (or shut down the pool) so work drains.
 - **Thread pools** — Python callables and I/O-bound work (`GetGlobalThreadPool`).
-- **Process / multiprocess pools** — CPU-bound Python callables
-  (`GetGlobalMultiprocessPool` / local machine pool).
+- **Local machine / multithreading pools** — CPU-bound Python callables
+  (`GetGlobalLocalMachinePool` or `GetGlobalMultithreadingPool`). There is no
+  `GetGlobalMultiprocessPool`.
+- **Serial pool** — one task at a time on a thread (`GetGlobalSerialPool`).
 - **Subprocess / ProcessPool** — **shell commands and external binaries** via
   string/`Popen` args (`GetGlobalProcessPool`). Do **not** pass Python callables
   to `ProcessPool.add_task` (raises `NotImplementedError`); use a multiprocess
@@ -31,4 +33,5 @@ still has not arrived, `ActiveJobCount` is unwound once and `wait` raises
 
 - **Full manual and API (umbrella):** [https://nornir.github.io/](https://nornir.github.io/)
 - **This package:** [Packages — nornir-pools](https://nornir.github.io/packages/nornir_pools.html)
+- **Which pool and stage shutdown:** [Performance — pools](https://nornir.github.io/performance/pools.html)
 - **API reference:** [`nornir_pools` module](https://nornir.github.io/api/nornir_pools.html)
