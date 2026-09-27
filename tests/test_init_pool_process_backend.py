@@ -24,7 +24,11 @@ import nornir_pools
 class TestItConfiguresTheWorkerBackend(unittest.TestCase):
 
     def test_the_imageregistration_hook_is_called(self):
-        with mock.patch('nornir_imageregistration.computational_lib.ConfigureForkPoolWorker') as configure:
+        # create=True: pools CI does not install imageregistration (pools is the lower package).
+        with mock.patch(
+            'nornir_imageregistration.computational_lib.ConfigureForkPoolWorker',
+            create=True,
+        ) as configure:
             nornir_pools.init_pool_process()
 
         configure.assert_called_once_with()
@@ -38,7 +42,10 @@ class TestItConfiguresTheWorkerBackend(unittest.TestCase):
 
     def test_the_hook_runs_even_when_no_logging_queue_is_supplied(self):
         """Queue logging is optional; skipping it must not skip the backend pin."""
-        with mock.patch('nornir_imageregistration.computational_lib.ConfigureForkPoolWorker') as configure:
+        with mock.patch(
+            'nornir_imageregistration.computational_lib.ConfigureForkPoolWorker',
+            create=True,
+        ) as configure:
             nornir_pools.init_pool_process(logging_queue=None)
 
         configure.assert_called_once_with()
@@ -48,7 +55,10 @@ class TestTheParentProcessIsUnaffected(unittest.TestCase):
     """The initializer is importable and callable in the parent; there it must change nothing."""
 
     def test_calling_it_in_the_parent_leaves_the_active_backend_alone(self):
-        import nornir_imageregistration
+        try:
+            import nornir_imageregistration
+        except ImportError:
+            self.skipTest("nornir_imageregistration not installed (optional for pools package CI)")
 
         before = nornir_imageregistration.GetActiveComputationLib()
 
