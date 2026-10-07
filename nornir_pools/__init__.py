@@ -132,6 +132,7 @@ loaded by the tasks.
 """
 
 import atexit
+import collections
 import datetime
 import glob
 import logging
@@ -142,8 +143,9 @@ import sys
 import threading
 import warnings
 import platform
+from collections.abc import Callable, Iterable, Iterator
 from enum import Enum
-from typing import ParamSpec, Protocol
+from typing import Any, ParamSpec, Protocol, TypeVar
 
 import nornir_pools.ipool as ipool
 import nornir_pools.local_machine_pool as local_machine_pool
@@ -568,9 +570,42 @@ def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = N
     return __CreatePoolFromFactory(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads, is_global=is_global)
 
 
+_T = TypeVar("_T")
+
+
+def submit_bounded(
+    submit: Callable[[_T], Any],
+    items: Iterable[_T],
+    *,
+    max_in_flight: int,
+    on_in_flight: Callable[[int], None] | None = None,
+) -> Iterator[Any]:
+    """Yield tasks in submission order while keeping at most *max_in_flight* queued.
+
+    The caller must exhaust the generator. Trailing items stay unsubmitted otherwise.
+    ``GetMultithreadingPool`` runs pickleable callables in worker processes. It is not
+    ``GetProcessPool``, which launches shell commands.
+    """
+    max_in_flight = max(1, max_in_flight)
+    in_flight: collections.deque[Any] = collections.deque()
+    for item in items:
+        in_flight.append(submit(item))
+        if on_in_flight is not None:
+            on_in_flight(len(in_flight))
+        if len(in_flight) >= max_in_flight:
+            yield in_flight.popleft()
+    while in_flight:
+        if on_in_flight is not None:
+            on_in_flight(len(in_flight))
+        yield in_flight.popleft()
+
+
 def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
-    """Get or create a specific thread pool to execute threads in other processes on the same computer using the
-    multiprocessing library """
+    """Get or create a pool that runs pickleable callables in worker processes.
+
+    Uses the multiprocessing library on this computer. This is not
+    ``GetProcessPool``, which launches shell commands.
+    """
     # warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
     if Poolname is None:
         return GetGlobalMultithreadingPool()
