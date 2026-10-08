@@ -15,20 +15,49 @@ that last property is a real constraint rather than defensive habit.
 from __future__ import annotations
 
 import builtins
+import sys
+import types
 import unittest
+from contextlib import contextmanager
 from unittest import mock
 
 import nornir_pools
 
 
+@contextmanager
+def _patched_configure_fork_pool_worker():
+    """Yield a mock standing in for ConfigureForkPoolWorker.
+
+    Package CI for pools does not install imageregistration. ``mock.patch`` still
+    imports every parent in the dotted path, so ``create=True`` cannot stand in
+    for a missing package. Stub the modules when the import fails.
+    """
+    try:
+        import nornir_imageregistration.computational_lib as computational_lib
+    except ImportError:
+        parent = types.ModuleType('nornir_imageregistration')
+        computational_lib = types.ModuleType('nornir_imageregistration.computational_lib')
+        configure = mock.Mock()
+        computational_lib.ConfigureForkPoolWorker = configure
+        parent.computational_lib = computational_lib
+        with mock.patch.dict(
+            sys.modules,
+            {
+                'nornir_imageregistration': parent,
+                'nornir_imageregistration.computational_lib': computational_lib,
+            },
+        ):
+            yield configure
+        return
+
+    with mock.patch.object(computational_lib, 'ConfigureForkPoolWorker') as configure:
+        yield configure
+
+
 class TestItConfiguresTheWorkerBackend(unittest.TestCase):
 
     def test_the_imageregistration_hook_is_called(self):
-        # create=True: pools CI does not install imageregistration (pools is the lower package).
-        with mock.patch(
-            'nornir_imageregistration.computational_lib.ConfigureForkPoolWorker',
-            create=True,
-        ) as configure:
+        with _patched_configure_fork_pool_worker() as configure:
             nornir_pools.init_pool_process()
 
         configure.assert_called_once_with()
@@ -42,10 +71,7 @@ class TestItConfiguresTheWorkerBackend(unittest.TestCase):
 
     def test_the_hook_runs_even_when_no_logging_queue_is_supplied(self):
         """Queue logging is optional; skipping it must not skip the backend pin."""
-        with mock.patch(
-            'nornir_imageregistration.computational_lib.ConfigureForkPoolWorker',
-            create=True,
-        ) as configure:
+        with _patched_configure_fork_pool_worker() as configure:
             nornir_pools.init_pool_process(logging_queue=None)
 
         configure.assert_called_once_with()
