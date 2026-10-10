@@ -49,9 +49,11 @@ Review issue #221 (found while reproducing #80).
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import unittest
+from unittest import mock
 
 import nornir_pools as pools
 import nornir_pools._test_pool_tasks as pool_tasks  # pyright: ignore[reportMissingImports]
@@ -358,6 +360,42 @@ class TestExistingSemanticsArePreserved(_PoolFixture):
         pool.wait_completion()
 
         self.assertEqual(0, len(pool._active_tasks))
+
+
+class TestClosePoolsShutdownTimeoutEnv(unittest.TestCase):
+    """``ClosePools(timeout=x)`` exposes ``x`` to each pool's drain, then restores the env.
+
+    The env var name is an operator-facing contract, so it is spelled out here rather
+    than read from the module constant.
+    """
+
+    ENV = 'NORNIR_POOL_SHUTDOWN_TIMEOUT'
+
+    def _close_pools_seeing_env(self, timeout: float | None) -> str | None:
+        """Run ClosePools with the pool walk stubbed; return the env value the drain saw."""
+        seen: list[str | None] = []
+        with mock.patch.object(pools, '_wait_pools'), \
+                mock.patch.object(pools, '_shutdown_pools',
+                                  side_effect=lambda _: seen.append(os.environ.get(self.ENV))):
+            pools.ClosePools(timeout=timeout)
+        self.assertEqual(1, len(seen))
+        return seen[0]
+
+    def test_timeout_is_set_during_shutdown_then_removed(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(self.ENV, None)
+            self.assertEqual('7.5', self._close_pools_seeing_env(7.5))
+            self.assertNotIn(self.ENV, os.environ)
+
+    def test_timeout_overrides_then_restores_an_operator_value(self):
+        with mock.patch.dict(os.environ, {self.ENV: '3'}):
+            self.assertEqual('7.5', self._close_pools_seeing_env(7.5))
+            self.assertEqual('3', os.environ.get(self.ENV))
+
+    def test_no_timeout_leaves_the_operator_value_alone(self):
+        with mock.patch.dict(os.environ, {self.ENV: '3'}):
+            self.assertEqual('3', self._close_pools_seeing_env(None))
+            self.assertEqual('3', os.environ.get(self.ENV))
 
 
 if __name__ == '__main__':

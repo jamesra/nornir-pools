@@ -535,9 +535,9 @@ def ClosePools(timeout: float | None = None) -> None:
     global profiler
 
     _log_pool_diag("ClosePools")
-    previous_shutdown_timeout = os.environ.get('NORNIR_POOL_SHUTDOWN_TIMEOUT')
+    previous_shutdown_timeout = os.environ.get(multiprocessthreadpool.SHUTDOWN_TIMEOUT_ENV)
     if timeout is not None:
-        os.environ['NORNIR_POOL_SHUTDOWN_TIMEOUT'] = str(timeout)
+        os.environ[multiprocessthreadpool.SHUTDOWN_TIMEOUT_ENV] = str(timeout)
     wait_error: BaseException | None = None
     try:
         try:
@@ -548,9 +548,9 @@ def ClosePools(timeout: float | None = None) -> None:
     finally:
         if timeout is not None:
             if previous_shutdown_timeout is None:
-                os.environ.pop('NORNIR_POOL_SHUTDOWN_TIMEOUT', None)
+                os.environ.pop(multiprocessthreadpool.SHUTDOWN_TIMEOUT_ENV, None)
             else:
-                os.environ['NORNIR_POOL_SHUTDOWN_TIMEOUT'] = previous_shutdown_timeout
+                os.environ[multiprocessthreadpool.SHUTDOWN_TIMEOUT_ENV] = previous_shutdown_timeout
     if wait_error is not None:
         raise wait_error
 

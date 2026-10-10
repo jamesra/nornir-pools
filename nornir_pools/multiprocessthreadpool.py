@@ -33,7 +33,9 @@ _worker_profiler_atexit_registered = False
 # enough that neither case can peg a core.
 _WAIT_COMPLETION_POLL_SECONDS = 0.05
 
-_SHUTDOWN_TIMEOUT_ENV = 'NORNIR_POOL_SHUTDOWN_TIMEOUT'
+# Env var operators set to bound each pool's shutdown drain (seconds). ``ClosePools(timeout=)``
+# sets and restores it too, so the name lives here once and is read by both.
+SHUTDOWN_TIMEOUT_ENV = 'NORNIR_POOL_SHUTDOWN_TIMEOUT'
 
 
 def _shutdown_timeout() -> float | None:
@@ -45,14 +47,14 @@ def _shutdown_timeout() -> float | None:
     eventually kill legitimate long-running work, which is worse than the hang it avoids.
     Operators who would rather lose a wedged task than a wedged teardown can set this.
     """
-    raw = os.environ.get(_SHUTDOWN_TIMEOUT_ENV)
+    raw = os.environ.get(SHUTDOWN_TIMEOUT_ENV)
     if not raw:
         return None
     try:
         value = float(raw)
     except ValueError:
         prettyoutput.LogErr(
-            f"{_SHUTDOWN_TIMEOUT_ENV} is not a number: {raw!r}. Waiting indefinitely instead.")
+            f"{SHUTDOWN_TIMEOUT_ENV} is not a number: {raw!r}. Waiting indefinitely instead.")
         return None
     if value <= 0:
         return None
