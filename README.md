@@ -35,3 +35,13 @@ still has not arrived, `ActiveJobCount` is unwound once and `wait` raises
 - **This package:** [Packages — nornir-pools](https://nornir.github.io/packages/nornir_pools.html)
 - **Which pool and stage shutdown:** [Performance — pools](https://nornir.github.io/performance/pools.html)
 - **API reference:** [`nornir_pools` module](https://nornir.github.io/api/nornir_pools.html)
+
+## Where user-facing documentation goes
+
+User-facing documentation lives in the umbrella repository ([jamesra/nornir](https://github.com/jamesra/nornir)), not in this package:
+
+- Package page: `docs/packages/nornir_pools.rst`
+- How-to guides and manuals: `docs/guides/`
+- API reference: `docs/api/nornir_pools.rst`
+
+Keep this README a short landing page that links to the published manual; do not add long guides or hand-maintained API listings here. Never edit the built site in `nornir.github.io`; it is CI deploy output (see `docs/development/publishing_documentation.rst` in the umbrella).
