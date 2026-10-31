@@ -47,7 +47,13 @@ class SerialPool(poolbase.PoolBase):
         super(SerialPool, self).__init__(name=name, *args, **kwargs)
 
     def add_task(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.Task:
-        retval = func(*args, **kwargs)
+        # Raise from wait_return(), not here: the thread and process pools report a task's
+        # exception there, so callers handle failures per task. Raising at submission skipped
+        # those handlers, e.g. one fully masked tile pair aborted a whole translate (C13-B010).
+        try:
+            retval = func(*args, **kwargs)
+        except Exception as e:  # noqa: BLE001 - re-raised by wait_return, as the other pools do
+            return nornir_pools.task.SerialTask(name, None, *args, exception=e, **kwargs)
         return nornir_pools.task.SerialTask(name, retval, *args, **kwargs)
 
     def add_process(self, name: str, func: Callable, *args, **kwargs) -> nornir_pools.task.TaskWithEvent:

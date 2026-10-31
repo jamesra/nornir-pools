@@ -166,10 +166,11 @@ class TaskWithEvent(Task, ABC):
 class SerialTask(Task):
     """Used for debugging and profiling.  Returns a task object but the function has been run serially."""
 
-    def __init__(self, name: str, retval: Any, *args, **kwargs):
+    def __init__(self, name: str, retval: Any, *args, exception: BaseException | None = None, **kwargs):
         super(SerialTask, self).__init__(name, *args, **kwargs)
         self._retval = retval
-        self.returncode = 0  # type: int
+        self._exception = exception
+        self.returncode = 0 if exception is None else 1  # type: int
 
     @property
     def iscompleted(self) -> bool:
@@ -179,4 +180,7 @@ class SerialTask(Task):
         return
 
     def wait_return(self):
+        """Return the function's result, or raise what it raised, as the other pools' tasks do."""
+        if self._exception is not None:
+            raise self._exception
         return self._retval
