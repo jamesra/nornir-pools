@@ -38,6 +38,19 @@ _WAIT_COMPLETION_POLL_SECONDS = 0.05
 SHUTDOWN_TIMEOUT_ENV = 'NORNIR_POOL_SHUTDOWN_TIMEOUT'
 
 
+EXIT_TIMEOUT_ENV = 'NORNIR_POOL_EXIT_TIMEOUT'
+_DEFAULT_EXIT_TIMEOUT_S = 60.0
+
+
+def _exit_timeout() -> float:
+    """Seconds ``shutdown`` waits for idle workers to exit after every task finished (default 60)."""
+    raw = os.environ.get(EXIT_TIMEOUT_ENV, '').strip()
+    try:
+        return max(0.0, float(raw)) if raw else _DEFAULT_EXIT_TIMEOUT_S
+    except ValueError:
+        return _DEFAULT_EXIT_TIMEOUT_S
+
+
 def _shutdown_timeout() -> float | None:
     """Seconds ``shutdown`` waits for tasks before forcing termination; ``None`` to wait forever.
 
@@ -406,7 +419,16 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
                     return
 
                 self._tasks.close()
-                self._tasks.join()
+                if not self._workers_exit_within(_exit_timeout()):
+                    # Every task has finished, so terminating loses nothing. On srv (RC3,
+                    # 2026-11-02) idle forkserver workers hung in their queue feeder-thread
+                    # join at exit and pool.join() waited 10+ minutes for them.
+                    self.logger.warning(
+                        "Pool %s: workers did not exit within %.0f s after all tasks finished; "
+                        "terminating them.", self.name, _exit_timeout())
+                    self.terminate_workers()
+                else:
+                    self._tasks.join()
 
                 # wait_completion only returns once _active_tasks is empty, so this
                 # holds by construction and the previous bare assert could never
@@ -433,6 +455,14 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         _ = self.tasks
         for index in range(int(self._num_processes)):
             self.add_task(f"{self.name} warmup {index}", worker)
+
+    def _workers_exit_within(self, timeout_s: float) -> bool:
+        """After ``close()``, wait up to *timeout_s* for the worker processes; True if all exited."""
+        workers = list(getattr(self._tasks, '_pool', None) or [])
+        deadline = time.monotonic() + timeout_s
+        for worker in workers:
+            worker.join(max(0.0, deadline - time.monotonic()))
+        return not any(worker.is_alive() for worker in workers)
 
     def terminate_workers(self) -> None:
         """Terminate worker processes without waiting for graceful pool close (test teardown)."""
