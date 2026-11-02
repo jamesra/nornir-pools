@@ -133,9 +133,11 @@ loaded by the tasks.
 
 import atexit
 import collections
+import concurrent.futures
 import datetime
 import glob
 import logging
+import math
 import os
 # import cProfile
 import pstats
@@ -189,15 +191,86 @@ __thread_limit_warning_shown = False
 def IsParallelPythonAvailable():
     return __ParallelPythonAvailable
 
-def init_pool_process(logging_queue=None, logging_level=None, the_lock=None):
-    """Worker initializer: configure queue logging and force the NumPy backend in workers.
+BLAS_THREADS_ENV = 'NORNIR_POOL_BLAS_THREADS'
+_BLAS_THREAD_ENV_VARS = ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS')
+_blas_limiter = None
 
-    Optional ``the_lock`` sets ``shared_lock`` (legacy API).
+
+def blas_threads_per_worker(num_workers: int | None) -> int:
+    """BLAS/OpenMP threads each of *num_workers* pool workers gets: ``ceil(cores / workers)``.
+
+    ``NORNIR_POOL_BLAS_THREADS`` overrides it. Without a limit every worker sized its
+    BLAS pool to the whole machine (127 threads per worker on srv's 128 cores), so a
+    full pool oversubscribed the CPU whenever workers did linear algebra at once.
+    """
+    override = os.environ.get(BLAS_THREADS_ENV, '').strip()
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            pass
+    cores = os.cpu_count() or 1
+    return max(1, math.ceil(cores / max(1, int(num_workers or cores))))
+
+
+def limit_blas_threads(num_threads: int | None) -> None:
+    """Cap this process's BLAS/OpenMP thread pools at *num_threads* (no-op for None).
+
+    Uses threadpoolctl, which works after NumPy has started its pools, and also sets
+    the usual environment variables so processes this one starts inherit the cap.
+    """
+    global _blas_limiter
+    if not num_threads:
+        return
+    for name in _BLAS_THREAD_ENV_VARS:
+        os.environ[name] = str(num_threads)
+    try:
+        from threadpoolctl import threadpool_limits
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            'threadpoolctl is not installed; BLAS threads in this worker are not limited')
+        return
+    _blas_limiter = threadpool_limits(limits=num_threads)
+
+
+def _executor_worker_init(blas_threads: int | None, initializer: Callable | None, initargs: tuple) -> None:
+    """Initializer behind :func:`CreateProcessPoolExecutor`: cap BLAS threads, then the caller's own."""
+    limit_blas_threads(blas_threads)
+    if initializer is not None:
+        initializer(*initargs)
+
+
+def CreateProcessPoolExecutor(max_workers: int,
+                              *,
+                              mp_context: Any = None,
+                              initializer: Callable | None = None,
+                              initargs: tuple = (),
+                              blas_threads: int | None = None) -> concurrent.futures.ProcessPoolExecutor:
+    """A ``concurrent.futures`` process pool with the same per-worker settings as nornir pools.
+
+    For callers that need a futures executor, for example a ``spawn`` context with their
+    own initializer (StosBrute GPU workers). Use this instead of constructing
+    ``ProcessPoolExecutor`` directly, so worker settings stay in one place. ``blas_threads``
+    defaults to :func:`blas_threads_per_worker` of *max_workers*.
+    """
+    if blas_threads is None:
+        blas_threads = blas_threads_per_worker(max_workers)
+    return concurrent.futures.ProcessPoolExecutor(
+        max_workers=max_workers, mp_context=mp_context, initializer=_executor_worker_init,
+        initargs=(blas_threads, initializer, tuple(initargs)))
+
+
+def init_pool_process(logging_queue=None, logging_level=None, the_lock=None, blas_threads=None):
+    """Worker initializer: configure queue logging, cap BLAS threads, and force NumPy in workers.
+
+    Optional ``the_lock`` sets ``shared_lock`` (legacy API). ``blas_threads`` is
+    normally :func:`blas_threads_per_worker` of the pool size.
     """
     global shared_lock
     shared_lock = the_lock
     if logging_queue is not None:
         nornir_logging_misc.ConfigureWorkerQueueLogging(log_queue=logging_queue, level=logging_level)
+    limit_blas_threads(blas_threads)
 
     # Forked workers inherit the parent's active backend without re-running module
     # import, so a GPU parent leaves them on CuPy and tile work would initialize CUDA
@@ -564,10 +637,14 @@ def GetThreadPool(Poolname: str | None = None, num_threads: int | None = None) -
     return __CreatePoolFromFactory(nornir_pools.threadpool.ThreadPool, Poolname, num_threads)
 
 
-def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = None, is_global=False) -> IPool:
+def GetLocalMachinePool(Poolname: str | None = None, num_threads: int | None = None, is_global=False,
+                        blas_threads: int | None = None) -> IPool:
+    """Get or create a local machine pool. *blas_threads* caps BLAS/OpenMP threads per worker
+    process; ``None`` means :func:`blas_threads_per_worker` of the pool size."""
     if Poolname is None:
         return GetGlobalLocalMachinePool()
-    return __CreatePoolFromFactory(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads, is_global=is_global)
+    return __CreatePoolFromFactory(nornir_pools.local_machine_pool.LocalMachinePool, Poolname, num_threads,
+                                   is_global=is_global, blas_threads=blas_threads)
 
 
 _T = TypeVar("_T")
@@ -600,16 +677,19 @@ def submit_bounded(
         yield in_flight.popleft()
 
 
-def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:
+def GetMultithreadingPool(Poolname: str | None = None, num_threads: int | None = None,
+                          blas_threads: int | None = None) -> IPool:
     """Get or create a pool that runs pickleable callables in worker processes.
 
     Uses the multiprocessing library on this computer. This is not
-    ``GetProcessPool``, which launches shell commands.
+    ``GetProcessPool``, which launches shell commands. *blas_threads* caps BLAS/OpenMP
+    threads per worker; ``None`` means :func:`blas_threads_per_worker` of the pool size.
     """
     # warnings.warn(DeprecationWarning("GetMultithreadingPool is deprecated.  Use GetLocalMachinePool instead"))
     if Poolname is None:
         return GetGlobalMultithreadingPool()
-    return __CreatePoolFromFactory(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads)
+    return __CreatePoolFromFactory(nornir_pools.multiprocessthreadpool.MultiprocessThreadPool, Poolname, num_threads,
+                                   blas_threads=blas_threads)
 
 
 def GetProcessPool(Poolname: str | None = None, num_threads: int | None = None) -> IPool:

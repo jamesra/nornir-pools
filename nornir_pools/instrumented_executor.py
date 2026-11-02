@@ -28,7 +28,8 @@ class InstrumentedThreadPoolExecutor(ThreadPoolExecutor):
         self._queued = 0
         self._active = 0
         self._lock = threading.Lock()
-        self._max_workers = max_workers
+        # Do not overwrite ThreadPoolExecutor._max_workers: the base class has already
+        # resolved max_workers=None to its default and uses it to start threads.
 
     def _publish(self) -> None:
         with self._lock:
@@ -38,7 +39,7 @@ class InstrumentedThreadPoolExecutor(ThreadPoolExecutor):
             self.pool_name,
             queued=queued,
             active=active,
-            max_workers=self._max_workers,
+            max_workers=self._max_workers,  # the resolved worker count
         )
 
     def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future:

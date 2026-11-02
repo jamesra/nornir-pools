@@ -338,7 +338,8 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
             log_queue = nornir_shared.misc.StartMultiprocessLoggingListener(level=logging.getLogger().getEffectiveLevel())
             self._tasks = NonDaemonPool(maxtasksperchild=self._maxtasksperchild, processes=self._num_processes,
                                         initializer=nornir_pools.init_pool_process,
-                                        initargs=(log_queue, logging.getLogger().getEffectiveLevel()))
+                                        initargs=(log_queue, logging.getLogger().getEffectiveLevel(), None,
+                                                  self._blas_threads))
 
         return self._tasks
 
@@ -366,7 +367,7 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
 
     def __init__(self, name: str, num_workers: int | None = None, maxtasksperchild: int | None = None,
                  authkey: bytes | None = None,
-                 *args, **kwargs):
+                 *args, blas_threads: int | None = None, **kwargs):
         self._tasks = None
         # Parent-only lock (not sent through Pool initializer; avoids fork/pickle surface for unused shared_lock).
         self._lock = multiprocessing.Lock()
@@ -376,6 +377,9 @@ class MultiprocessThreadPool(nornir_pools.poolbase.PoolBase):
         num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
         self._num_processes = num_workers
+        # BLAS/OpenMP threads per worker; by default the cores divided among the workers.
+        self._blas_threads = (blas_threads if blas_threads is not None
+                              else nornir_pools.blas_threads_per_worker(num_workers))
         self._maxtasksperchild = maxtasksperchild
         # A list of incomplete AsyncResults
         self._active_tasks = {}  # type : Dict[int, MultiprocessThreadTask]

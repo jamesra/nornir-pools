@@ -54,5 +54,15 @@ class TestInstrumentedExecutor(unittest.TestCase):
         self.assertIn("unit-executor", names)
 
 
+class TestInstrumentedExecutorDefaults(unittest.TestCase):
+
+    def test_default_worker_count_runs_tasks(self):
+        """max_workers=None must keep ThreadPoolExecutor's resolved default, not overwrite it with None."""
+        with InstrumentedThreadPoolExecutor("defaults") as executor:
+            results = list(executor.map(lambda x: x * 2, range(8)))
+            self.assertIsInstance(executor._max_workers, int)
+        self.assertEqual(results, [x * 2 for x in range(8)])
+
+
 if __name__ == "__main__":
     unittest.main()

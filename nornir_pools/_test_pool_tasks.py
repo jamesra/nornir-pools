@@ -58,3 +58,21 @@ def SquareTheNumberWithDelay(num: float) -> float:
 
 def SquareTheNumber(num: float) -> float:
     return num * num
+
+
+def ReportBlasThreads(_: int) -> int:
+    """Largest BLAS/OpenMP thread pool this worker reports (threadpoolctl)."""
+    import numpy  # noqa: F401 - load the BLAS so threadpoolctl can see it
+    from threadpoolctl import threadpool_info
+
+    return max((info['num_threads'] for info in threadpool_info()), default=0)
+
+
+def SetEnvironment(name: str, value: str) -> None:
+    """Worker initializer for tests: set one environment variable."""
+    os.environ[name] = value
+
+
+def GetEnvironment(name: str) -> str | None:
+    """Return one environment variable as the worker sees it."""
+    return os.environ.get(name)

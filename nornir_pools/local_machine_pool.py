@@ -53,7 +53,8 @@ class LocalMachinePool(poolbase.PoolBase):
             if self.is_global:
                 self._mtpool = nornir_pools.GetGlobalMultithreadingPool()
             else:
-                self._mtpool = nornir_pools.GetMultithreadingPool(self.name + " multithreading pool", self._num_threads)
+                self._mtpool = nornir_pools.GetMultithreadingPool(self.name + " multithreading pool", self._num_threads,
+                                                                  blas_threads=self._blas_threads)
 
         return self._mtpool
 
@@ -70,7 +71,8 @@ class LocalMachinePool(poolbase.PoolBase):
     def get_active_nodes(self):
         return ["localhost"]
 
-    def __init__(self, name: str, num_workers: int | None = None, is_global=False, *args, **kwargs):
+    def __init__(self, name: str, num_workers: int | None = None, is_global=False, *args,
+                 blas_threads: int | None = None, **kwargs):
         '''
         Constructor
         '''
@@ -78,6 +80,7 @@ class LocalMachinePool(poolbase.PoolBase):
         num_workers = nornir_pools.ApplyOSThreadLimit(num_workers)
 
         self._num_threads = num_workers
+        self._blas_threads = blas_threads
 
         self.is_global = is_global
         self._mtpool = None
